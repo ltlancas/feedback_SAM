@@ -63,6 +63,55 @@ def Rch(Q0, nbar, pdotw, rhobar, ci = 10*u.km/u.s, alphaB = 3.11e-13*(u.cm**3/u.
     r_ch = Req(pdotw,rhobar, ci=ci)**4 / RSt(Q0, nbar,alphaB=alphaB)**3
     return r_ch.to("pc")
 
+def Rwshock(Mdotw, rhobar, Vwind):
+    # gives the wind shock radius
+    # Mdotw : wind mass loss rate
+    # rhobar : background mass density
+    # Vwind : wind velocity
+
+    # start by making sure that the dimensions of the arguments are correct
+    t1 = u.get_physical_type(Mdotw*u.s)=="mass"
+    t2 = u.get_physical_type(rhobar)=="mass density"
+    t3 = u.get_physical_type(Vwind)=="speed"
+    if not(t1):
+        print("Units of Mdotw are incorrect")
+        assert(False)
+    if not(t2):
+        print("Units of rhobar are off")
+        assert(False)
+    if not(t3):
+        print("Units of Vwind are off")
+        assert(False)
+
+    r_wshock = (Mdotw/(4*np.pi*rhobar*Vwind))**(1./2)
+
+    return r_wshock.to("pc")
+
+def Twshock(Mdotw, rhobar, Vwind):
+    # gives the wind shock time
+    # Mdotw : wind mass loss rate
+    # rhobar : background mass density
+    # Vwind : wind velocity
+
+    # dimensions are checked in Rwshock
+    t_wshock = Rwshock(Mdotw, rhobar, Vwind)/Vwind
+
+    return t_wshock.to("Myr")
+
+def Tcool(nbar, Lwind):
+    # give the shell formation/shell cooling time for a
+    # a Weaver-like Wind-blown bubble
+    # nbar : the number density of hydrgen in the background
+    # Lwind : the wind luminosity
+
+    # Equation 8 from Mac Low & McCray (1988)
+    t_cool = 2.3e-2*u.Myr
+    t_cool *= (nbar/(u.cm**-3))**-0.71
+    t_cool *= (Lwind/(1e38*u.erg/u.s))**0.29
+
+    return t_cool
+
+
 def Tion(nbar, alphaB=3.11e-13*(u.cm**3/u.s)):
     # gives the ionization-recombination time-scale in Myr
     # nbar : the number density of hydrgen in the background

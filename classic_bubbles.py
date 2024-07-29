@@ -143,3 +143,45 @@ class Weaver(Bubble):
             assert(False)
         press_we = (10./33)*self.Lwind*self.t/((4*np.pi/3)*self.radius(t)**3)
         return (press_we/aconsts.k_B).to("K/cm3")
+    
+class MomentumDriven(Bubble):
+    # Momentum-driven bubble solution
+    def __init__(self, rho0, pdotw):
+        super().__init__(rho0)
+        self.pdotw = pdotw
+        t1 = u.get_physical_type(pdotw)=="force"
+        if not(t1):
+            print("Units of pdotw are incorrect")
+            assert(False)
+
+    def radius(self, t):
+        t1 = u.get_physical_type(t)=="time"
+        if not t1:
+            print("Units of t are off")
+            assert(False)
+        r_md = ((3*self.pdotw*t)/(2*np.pi*self.rho0))**(1./2)
+        return r_md.to("pc")
+    
+    def velocity(self, t):
+        t1 = u.get_physical_type(t)=="time"
+        if not t1:
+            print("Units of t are off")
+            assert(False)
+        v_md = 0.5*self.radius(t)/t
+        return v_md.to("km/s")
+    
+    def momentum(self, t):
+        t1 = u.get_physical_type(t)=="time"
+        if not t1:
+            print("Units of t are off")
+            assert(False)
+        pr_md = self.pdotw*t
+        return pr_md.to("solMass*km/s")
+    
+    def pressure(self, t):
+        t1 = u.get_physical_type(t)=="time"
+        if not t1:
+            print("Units of t are off")
+            assert(False)
+        press_md = self.pdotw/(4*np.pi*self.radius(t)**2)
+        return (press_md/aconsts.k_B).to("K/cm3")

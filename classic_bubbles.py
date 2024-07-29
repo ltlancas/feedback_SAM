@@ -5,7 +5,6 @@ import numpy as np
 from astropy import units as u
 from astropy import constants as aconsts
 import quantities
-from scipy.integrate import solve_ivp
 
 class Bubble():
     def __init__(self, rho0):

@@ -24,7 +24,7 @@ def estar_Grudic18(Sigma_cl, Scrit=2800*u.Msun/u.pc**2, emax=0.77):
 def sigma_ion_Kim18(Xi, ci=10*u.km/u.s, alphaB=3.11e-13*(u.cm**3/u.s),
                     muH=1.4):
     # ionization surface density from Equation 24 of Kim et al. 2018
-    # Xi : ionizing photon rate per unit stela mass
+    # Xi : ionizing photon rate per unit stellar mass
     # ci : ionized gas sound speed
     # alphaB : case B recombination rate
     # muH : mean molecular weight per hydrogen nucleus
@@ -60,6 +60,40 @@ def phitphiion_Kim18(Sigma_cl):
     (c1, c2, c3) = (-2.89, 2.11, 25.3)
     S0 = Sigma_cl.to("Msun/pc^2").value
     return c1 + c2*np.log10(S0 + c3)
+
+def estar_ion_Kim18(Sigma_cl, Xi, ci=10*u.km/u.s, alphaB=3.11e-13*(u.cm**3/u.s),
+                    muH=1.4):
+    # sfe prescription from Equation 26 of Kim et al. 2018 
+    # Sigma_cl : cloud surface density
+    # Xi : ionizing photon rate per unit stellar mass
+    # ci : ionized gas sound speed
+    # alphaB : case B recombination rate
+    # muH : mean molecular weight per hydrogen nucleus
+    t1 = u.get_physical_type(Sigma_cl)=="surface mass density"
+    t2 = u.get_physical_type(Xi*u.g)=="frequency"
+    t3 = u.get_physical_type(ci)=="speed"
+    t4 = u.get_physical_type(alphaB)=="volumetric flow rate"
+    t5 = u.get_physical_type(muH)=="dimensionless"
+    if not(t1):
+        print("Units of Sigma_cl are off")
+        assert(False)
+    if not(t2):
+        print("Units of Xi are off")
+        assert(False)
+    if not(t3):
+        print("Units of ci are off")
+        assert(False)
+    if not(t4):
+        print("Units of alphaB are off")
+        assert(False)
+    if not(t5):
+        print("Units of muH are off")
+        assert(False)
+    
+    sion = sigma_ion_Kim18(Xi, ci=ci, alphaB=alphaB, muH=muH)
+    phitphiion = phitphiion_Kim18(Sigma_cl)
+    xi = Sigma_cl/(phitphiion*sion)
+    return (2*xi/(1 + np.sqrt(1 + 4*xi**2)))**2
 
 
 def pstar_mstar(Sigma_cl, prefac=135*u.km/u.s):

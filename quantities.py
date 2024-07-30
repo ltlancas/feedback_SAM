@@ -6,6 +6,10 @@ import numpy as np
 from astropy import units as u
 from astropy import constants as aconsts
 
+#########################################################################################
+################################ Length Scale Quantities ################################
+#########################################################################################
+
 def RSt(Q0, nbar, alphaB = 3.11e-13*(u.cm**3/u.s)):
     # Returns the Strömgren Radius in parsecs
     # Q0 : the ionizing photon rate
@@ -86,6 +90,34 @@ def Rwshock(Mdotw, rhobar, Vwind):
     r_wshock = (Mdotw/(4*np.pi*rhobar*Vwind))**(1./2)
 
     return r_wshock.to("pc")
+
+def Rcl(Mcl, nbar, muH = 1.4):
+    # gives the cloud radius
+    # Mcl : cloud mass
+    # nbar : background number density
+    # muH : mean molecular weight
+
+    # start by making sure that the dimensions of the arguments are correct
+    t1 = u.get_physical_type(Mcl)=="mass"
+    t2 = u.get_physical_type(nbar)=="number density"
+    t3 = u.get_physical_type(muH)=="dimensionless"
+    if not(t1):
+        print("Units of Mcl are incorrect")
+        assert(False)
+    if not(t2):
+        print("Units of nbar are off")
+        assert(False)
+    if not(t3):
+        print("Units of muH are off")
+        assert(False)
+
+    r_cl = (3*Mcl/(4*np.pi*nbar*muH*aconsts.m_p))**(1./3)
+
+    return r_cl.to("pc")
+
+#########################################################################################
+################################# Time Scale Quantities #################################
+#########################################################################################
 
 def Twshock(Mdotw, rhobar, Vwind):
     # gives the wind shock time

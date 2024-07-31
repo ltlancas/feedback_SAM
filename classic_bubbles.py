@@ -69,7 +69,7 @@ class Spitzer(Bubble):
         if not t1:
             print("Units of t are off")
             assert(False)
-        r_sp = self.Rst*(1 + 7*t/(4*self.tdio))**(4./7)
+        r_sp = self.RSt*(1 + 7*t/(4*self.tdio))**(4./7)
         return r_sp.to("pc")
     
     def velocity(self, t):

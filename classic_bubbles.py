@@ -158,7 +158,7 @@ class MomentumDriven(Bubble):
         if not t1:
             print("Units of t are off")
             assert(False)
-        r_md = ((3*self.pdotw*t)/(2*np.pi*self.rho0))**(1./2)
+        r_md = ((3*self.pdotw*t**2)/(2*np.pi*self.rho0))**(1./4)
         return r_md.to("pc")
     
     def velocity(self, t):

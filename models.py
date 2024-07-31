@@ -20,11 +20,15 @@ class JointBubbleUncoupled(Bubble):
                  ci = 10*u.km/u.s, alphaB = 3.11e-13*(u.cm**3/u.s),
                  muH = 1.4, ic1op = 0, ic2op = 4):
         super().__init__(rho0)
+        # set parameters
         self.Q0 = Q0
         self.pdotw = pdotw
         self.ci = ci
         self.alphaB = alphaB
         self.muH = muH
+        self.ic1op = ic1op
+        self.ic2op = ic2op
+        # check that the units are correct
         t1 = u.get_physical_type(ci)=="speed"
         t2 = u.get_physical_type(Q0)=="frequency"
         t3 = u.get_physical_type(pdotw)=="force"
@@ -48,7 +52,7 @@ class JointBubbleUncoupled(Bubble):
 
         self.nbar = rho0/(muH*aconsts.m_p)
         self.RSt = quantities.RSt(Q0, self.nbar, alphaB=alphaB)
-        self.teq = quantities.Teq(Q0, self.nbar, pdotw, rho0, ci=ci, alphaB=alphaB)
+        self.teq = quantities.Teq(pdotw, rho0, ci=ci)
         self.Req = quantities.Req(pdotw, rho0, ci=ci)
         self.Rch = quantities.Rch(Q0, self.nbar, pdotw, rho0, ci=ci, alphaB=alphaB)
         self.tdio = quantities.Tdion(Q0, self.nbar, ci=ci, alphaB=alphaB)
@@ -60,19 +64,21 @@ class JointBubbleUncoupled(Bubble):
         # separate momentum-driven wind bubble
         self.wind_bubble = cb.MomentumDriven(rho0, pdotw)
         # call ODE integrator to get the joint evolution solution
-        (self.chi, self.xiw, self.xii, self.psii) = self.joint_evol(self.eta,ic1op,ic2op)
+        (self.chi, self.xiw, self.xii, self.psii) = self.joint_evol()
 
-    def joint_evol(eta,ic1op,ic2op):
+    def joint_evol(self):
         # Gives the solution for the joint dynamical evolution of
         # photo-ionized gas and a wind bubble
         # eta : the RSt/Rch ratio, free parameter of the model
         # ic1op : the choice of initial condition for Rw/Rch
         # ic2op : the choice of initial condition for dR_i/dt
 
+        eta = self.eta.value
+
         # set the initial conditions
-        if (ic1op==0):
+        if (self.ic1op==0):
             xiw0 = eta**0.75
-        elif (ic1op==1):
+        elif (self.ic1op==1):
             xiw0 = eta**1.5
         else:
             print("Bad option for initial condition 1")
@@ -81,19 +87,21 @@ class JointBubbleUncoupled(Bubble):
         xii0 = xiw0*((1+xiw0)**(1./3))
 
         # initial condition for derivative, psi
-        if (ic2op==0):
+        if (self.ic2op==0):
             psi0 = 0
-        elif (ic2op==1):
+        elif (self.ic2op==1):
             psi0 = eta
-        elif (ic2op==2):
-            psi0 = np.pi*(eta**3.25)/(np.sqrt(2)*(xii0**3))
-        elif (ic2op==3):
+        elif (self.ic2op==2):
+            #psi0 = np.pi*(eta**3.25)/(np.sqrt(2)*(xii0**3))
+            psi0 = 3*(eta**3.25)/(2*np.sqrt(2)*(xii0**3))
+        elif (self.ic2op==3):
             RiRst = 1 + 7*np.sqrt(2)*np.pi*(eta**-0.25)/18
             psi0 = eta*(RiRst**(3./7))*(1 - RiRst**(-6./7))
-        elif (ic2op==4):
+        elif (self.ic2op==4):
             RiRst = 1 + 7*np.sqrt(2)*np.pi*(eta**-0.25)/18
             psi0 = eta*(RiRst**(3./7))*(1 - RiRst**(-6./7))
-            psi0 += np.pi*(eta**3.25)/(np.sqrt(2)*(xii0**3))
+            #psi0 += np.pi*(eta**3.25)/(np.sqrt(2)*(xii0**3))
+            psi0 += 3*(eta**3.25)/(2*np.sqrt(2)*(xii0**3))
         else:
             print("Bad option for initial condition 2")
             assert(False)

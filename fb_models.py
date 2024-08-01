@@ -250,7 +250,6 @@ class JointBubbleUncoupled(Bubble):
         # separate momentum-driven wind bubble
         self.wind_bubble = MomentumDriven(rho0, pdotw)
         # call ODE integrator to get the joint evolution solution
-        #(self.chi, self.xiw, self.xii, self.psii) = self.joint_evol()
         self.joint_sol = self.joint_evol()
 
     def get_xiw(self, xii):
@@ -286,7 +285,6 @@ class JointBubbleUncoupled(Bubble):
         elif (self.ic2op==1):
             psi0 = eta
         elif (self.ic2op==2):
-            #psi0 = np.pi*(eta**3.25)/(np.sqrt(2)*(xii0**3))
             psi0 = 3*(eta**3.25)/(2*np.sqrt(2)*(xii0**3))
         elif (self.ic2op==3):
             RiRst = 1 + 7*np.sqrt(2)*(eta**-0.25)/12
@@ -294,7 +292,6 @@ class JointBubbleUncoupled(Bubble):
         elif (self.ic2op==4):
             RiRst = 1 + 7*np.sqrt(2)*(eta**-0.25)/12
             psi0 = eta*(RiRst**(3./7))*(1 - RiRst**(-6./7))
-            #psi0 += np.pi*(eta**3.25)/(np.sqrt(2)*(xii0**3))
             psi0 += 3*(eta**3.25)/(2*np.sqrt(2)*(xii0**3))
         else:
             print("Bad option for initial condition 2")
@@ -314,15 +311,7 @@ class JointBubbleUncoupled(Bubble):
             return (psi,t1-t2)
 
         # use solve_ivp to get solution
-        sol = solve_ivp(derivs,[0,100],[xii0,psi0],dense_output=True)
-
-        #chi = sol["t"]
-        #xiw = np.interp(sol["y"][0],xii_range,xiw_prec)
-        #xii = sol["y"][0]
-        #psii = sol["y"][1]
-
-        #return(chi,xiw,xii,psii)
-        return sol
+        return solve_ivp(derivs,[0,100],[xii0,psi0],dense_output=True)
 
 
     def radius(self, t):
@@ -403,4 +392,3 @@ class JointBubbleUncoupled(Bubble):
         press = self.spitz_bubble.pressure(t)*(t<self.teq)
         press += self.pressure(t)*(t>self.teq)
         return press
-        

@@ -64,7 +64,8 @@ class JointBubbleUncoupled(Bubble):
         # separate momentum-driven wind bubble
         self.wind_bubble = cb.MomentumDriven(rho0, pdotw)
         # call ODE integrator to get the joint evolution solution
-        (self.chi, self.xiw, self.xii, self.psii) = self.joint_evol()
+        #(self.chi, self.xiw, self.xii, self.psii) = self.joint_evol()
+        self.joint_sol = self.joint_evol()
 
     def joint_evol(self):
         # Gives the solution for the joint dynamical evolution of
@@ -125,14 +126,15 @@ class JointBubbleUncoupled(Bubble):
             return (psi,t1-t2)
 
         # use solve_ivp to get solution
-        sol = solve_ivp(derivs,[0,100],[xii0,psi0])
+        sol = solve_ivp(derivs,[0,100],[xii0,psi0],dense_output=True)
 
-        chi = sol["t"]
-        xiw = np.interp(sol["y"][0],xii_range,xiw_prec)
-        xii = sol["y"][0]
-        psii = sol["y"][1]
+        #chi = sol["t"]
+        #xiw = np.interp(sol["y"][0],xii_range,xiw_prec)
+        #xii = sol["y"][0]
+        #psii = sol["y"][1]
 
-        return(chi,xiw,xii,psii)
+        #return(chi,xiw,xii,psii)
+        return sol
 
 
     def radius(self, t):
@@ -142,9 +144,10 @@ class JointBubbleUncoupled(Bubble):
         if not t1:
             print("Units of t are off")
             assert(False)
-        ri = self.spitz_bubble.radius(t)*(t<self.teq)
-        ri += np.interp(t-self.teq,self.chi*self.tdio,self.xii*self.Rch)*(t>self.teq)
-        return ri.to("pc")
+        ri = self.spitz_bubble.radius(t)*(t<self.teq).to("pc")
+        solution =  self.joint_sol.sol((t-self.teq/self.tdio).value)
+        ri += (solution.y[0]*self.Rch*(t>self.teq)).ti("pc")
+        return ri
 
     def wind_radius(self, t):
         # Returns the radius of the wind bubble at time t

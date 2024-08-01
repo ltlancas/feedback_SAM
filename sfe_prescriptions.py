@@ -142,32 +142,41 @@ def estar_Kim18(Sigma_cl, vej=15*u.km/u.s,
 class TK16():
     # Thompson & Krumholz 2016 model for the evolution of the star formation efficiency
     # in a molecular cloud
-    def __init__(self, Sigma_cl, epsff, pdot_Mstar=30*u.km/u.s/u.Myr, sig_lnS=1.5):
+    def __init__(self, Mcl, Rcl, epsff, pdot_Mstar=30*u.km/u.s/u.Myr, sig_lnS=1.5):
         # Sigma_cl : cloud surface density
         # epsff : star formation efficiency per free-fall time
         # pdot_Mstar : momentum input rate per stellar mass
         # sig_lnS : std dev of the log-normal distribution of surface densities
-        t1 = u.get_physical_type(Sigma_cl)=="surface mass density"
-        t2 = u.get_physical_type(epsff)=="dimensionless"
-        t3 = u.get_physical_type(pdot_Mstar*u.Msun)=="force"
-        t4 = u.get_physical_type(sig_lnS)=="dimensionless"
+        t1 = u.get_physical_type(Mcl)=="mass"
+        t2 = u.get_physical_type(Rcl)=="length"
+        t3 = u.get_physical_type(epsff)=="dimensionless"
+        t4 = u.get_physical_type(pdot_Mstar*u.Msun)=="force"
+        t5 = u.get_physical_type(sig_lnS)=="dimensionless"
         if not(t1):
             print("Units of Sigma_cl are off")
             assert(False)
         if not(t2):
-            print("Units of epsff are off")
+            print("Units of Rcl are off")
             assert(False)
         if not(t3):
-            print("Units of pdot_Mstar are off")
+            print("Units of epsff are off")
             assert(False)
         if not(t4):
+            print("Units of pdot_Mstar are off")
+            assert(False)
+        if not(t5):
             print("Units of sig_lnS are off")
             assert(False)
-        self.Sigma_cl = Sigma_cl
+        self.Mcl = Mcl
+        self.Rcl = Rcl
+        self.Sigma_cl = Mcl/(np.pi*Rcl**2)
+        self.rhobar = Mcl/(4*np.pi*Rcl**3/3)
         self.epsff = epsff
         self.pdot_Mstar = pdot_Mstar
         self.sig_lnS = sig_lnS
-        self.Gamma = (pdot_Mstar/(4*np.pi*aconsts.G*Sigma_cl)).value
+        self.Gamma = (pdot_Mstar/(4*np.pi*aconsts.G*self.Sigma_cl)).value
+
+        self.tff0 = (np.sqrt(3*np.pi/(32*aconsts.G*self.rhobar))).to("Myr")
 
         self.solution = self.get_solution()
 
@@ -201,3 +210,15 @@ class TK16():
 
         sol = solve_ivp(derivs, [0, 500], y0, events=[gas_depleted], dense_output=True)
         return sol
+    
+    def eps_gas(self, t):
+        # get the gas fraction as a function of time
+        return self.solution.sol(t)[0]
+    
+    def eps_ej(self, t):
+        # get the ejected gas as a function of time
+        return self.solution.sol(t)[1]
+    
+    def eps_star(self, t):
+        # get the star formation efficiency at a given time
+        return self.solution.sol(t)[2]

@@ -67,6 +67,13 @@ class JointBubbleUncoupled(Bubble):
         #(self.chi, self.xiw, self.xii, self.psii) = self.joint_evol()
         self.joint_sol = self.joint_evol()
 
+    def get_xiw(self, xii):
+        xiw = []
+        for xi in xii:
+            p = [1.0, 1.0, 0., 0., -1*(xi**3)]
+            xiw.append(np.real(np.roots(p)[-1]))
+        return np.array(xiw)
+
     def joint_evol(self):
         # Gives the solution for the joint dynamical evolution of
         # photo-ionized gas and a wind bubble
@@ -109,12 +116,7 @@ class JointBubbleUncoupled(Bubble):
 
         # pre-calculate the relationship between xii and xiw
         xii_range = np.linspace(xii0/2,100*xii0,1000)
-        xiw_prec = []
-        for xi in xii_range:
-            p = [1.0, 1.0, 0., 0., -1*(xi**3)]
-            xiw_prec.append(np.real(np.roots(p)[-1]))
-
-        xiw_prec = np.array(xiw_prec)
+        xiw_prec = self.get_xiw(xii_range)
 
         # defin the differential equations
         def derivs(chi,y):
@@ -144,10 +146,10 @@ class JointBubbleUncoupled(Bubble):
         if not t1:
             print("Units of t are off")
             assert(False)
-        ri = self.spitz_bubble.radius(t)*(t<self.teq).to("pc")
-        solution =  self.joint_sol.sol((t-self.teq/self.tdio).value)
-        ri += (solution.y[0]*self.Rch*(t>self.teq)).ti("pc")
-        return ri
+        ri = self.spitz_bubble.radius(t)*(t<self.teq)
+        solution =  self.joint_sol.sol(((t-self.teq)/self.tdio).value)
+        ri += solution.y[0]*self.Rch*(t>self.teq)
+        return ri.to("pc")
 
     def wind_radius(self, t):
         # Returns the radius of the wind bubble at time t
@@ -160,7 +162,9 @@ class JointBubbleUncoupled(Bubble):
         # up until teq the wind bubble follows the normal momentum-driven solution
         rw = self.wind_bubble.radius(t)*(t<self.teq)
         # afterwards it follows the joint evolution solution
-        rw += np.interp(t-self.teq,self.chi*self.tdio,self.xiw*self.Rch)*(t>self.teq)
+        solution =  self.joint_sol.sol(((t-self.teq)/self.tdio).value)
+        xiw = self.get_xiw(solution.y[0])
+        rw += xiw*self.Rch*(t>self.teq)
         return rw.to("pc")
 
     def velocity(self, t):
@@ -173,7 +177,8 @@ class JointBubbleUncoupled(Bubble):
         
         # up until teq the ionized bubble follows the Spitzer solution
         vi = self.spitz_bubble.velocity(t)*(t<self.teq)
-        vi += np.interp(t-self.teq,self.chi*self.tdio,self.psii*self.Rch/self.tdio)*(t>self.teq)
+        solution =  self.joint_sol.sol(((t-self.teq)/self.tdio).value)
+        vi += solution.y[1]*self.Rch/self.tdio*(t>self.teq)
         return vi.to("km/s")
     
     def momentum(self, t):
@@ -184,7 +189,8 @@ class JointBubbleUncoupled(Bubble):
             print("Units of t are off")
             assert(False)
         prefac = 4*np.pi*self.rho0*self.Rch**4/(3*self.tdio)
-        pr = prefac*np.interp(t-self.teq,self.chi*self.tdio, self.psii*self.xii**3)*(t>self.teq)
+        solution =  self.joint_sol.sol(((t-self.teq)/self.tdio).value)
+        pr = prefac*solution.y[1]*solution.y[0]**3*(t>self.teq)
         pr += self.spitz_bubble.momentum(t)*(t<self.teq)
         pr += self.wind_bubble.momentum(t)*(t<self.teq)
         return pr.to("solMass*km/s")

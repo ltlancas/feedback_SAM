@@ -56,6 +56,7 @@ class JointBubbleUncoupled(Bubble):
         self.Req = quantities.Req(pdotw, rho0, ci=ci)
         self.Rch = quantities.Rch(Q0, self.nbar, pdotw, rho0, ci=ci, alphaB=alphaB)
         self.tdio = quantities.Tdion(Q0, self.nbar, ci=ci, alphaB=alphaB)
+        self.tff = quantities.Tff(rho0)
 
         self.eta = self.RSt/self.Rch
 

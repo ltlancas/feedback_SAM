@@ -172,7 +172,7 @@ def Tff(rhobar):
         print("Units of rhobar are off")
         assert(False)
     
-    t_ff = (3*np.pi/(32*aconsts.G*rhobar))
+    t_ff = (3*np.pi/(32*aconsts.G*rhobar))**(1./2)
 
     return t_ff.to("Myr")
 

@@ -5,6 +5,8 @@
 import numpy as np
 from astropy import units as u
 from astropy import constants as aconsts
+from scipy.special import erf
+from scipy.integrate import solve_ivp
 
 def estar_Grudic18(Sigma_cl, Scrit=2800*u.Msun/u.pc**2, emax=0.77):
     # sfe prescription from Equation 11 of Grudić et al. 2018
@@ -136,3 +138,66 @@ def estar_Kim18(Sigma_cl, vej=15*u.km/u.s,
         print("Units of prefac are off")
         assert(False)
     return (1- epsej)/(1 + pstar_mstar(Sigma_cl,prefac=prefac)/vej)
+
+class TK16():
+    # Thompson & Krumholz 2016 model for the evolution of the star formation efficiency
+    # in a molecular cloud
+    def __init__(self, Sigma_cl, epsff, pdot_Mstar=30*u.km/u.s/u.Myr, sig_lnS=1.5):
+        # Sigma_cl : cloud surface density
+        # epsff : star formation efficiency per free-fall time
+        # pdot_Mstar : momentum input rate per stellar mass
+        # sig_lnS : std dev of the log-normal distribution of surface densities
+        t1 = u.get_physical_type(Sigma_cl)=="surface mass density"
+        t2 = u.get_physical_type(epsff)=="dimensionless"
+        t3 = u.get_physical_type(pdot_Mstar*u.Msun)=="force"
+        t4 = u.get_physical_type(sig_lnS)=="dimensionless"
+        if not(t1):
+            print("Units of Sigma_cl are off")
+            assert(False)
+        if not(t2):
+            print("Units of epsff are off")
+            assert(False)
+        if not(t3):
+            print("Units of pdot_Mstar are off")
+            assert(False)
+        if not(t4):
+            print("Units of sig_lnS are off")
+            assert(False)
+        self.Sigma_cl = Sigma_cl
+        self.epsff = epsff
+        self.pdot_Mstar = pdot_Mstar
+        self.sig_lnS = sig_lnS
+        self.Gamma = (pdot_Mstar/(4*np.pi*aconsts.G*Sigma_cl)).value
+
+        self.solution = self.get_solution()
+
+    def zeta_m(self, x):
+        arg = (self.sig_lnS**2 -2*x)/(2*self.sig_lnS*np.sqrt(2))
+        return 0.5*(1- erf(arg))
+
+    def get_solution(self):
+        # gets the solution to the Thompson & Krumholz '16 ODE model
+        # using scipy's solve_ivp
+        # initial conditions eps_gas, eps_ej, eps_star
+        y0 = [1,0,0]
+
+        def gas_depleted(t, y):
+            # function to determine when to stop integrating
+            # based on gas being depleted to less than 0.1%
+            return y[0] - 1e-3
+
+        def derivs(t, y):
+            # y = [S, Sdot, Sddot]
+            (eg,eej,est) = y
+            xcrit = np.log(4*self.Gamma*est/(3*eg*(est+eg)))
+            zetah = self.zeta_m(xcrit)
+            deej = zetah*eg*(eg+est)**0.5
+            dest = self.epsff*eg*(eg+est)**0.5
+            deg = -deej - dest
+            return (deg, deej, dest)
+        
+        # make sure to terminate integration on these events
+        gas_depleted.terminal = True
+
+        sol = solve_ivp(derivs, [0, 500], y0, events=[gas_depleted], dense_output=True)
+        return sol

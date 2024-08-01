@@ -95,10 +95,10 @@ class JointBubbleUncoupled(Bubble):
             #psi0 = np.pi*(eta**3.25)/(np.sqrt(2)*(xii0**3))
             psi0 = 3*(eta**3.25)/(2*np.sqrt(2)*(xii0**3))
         elif (self.ic2op==3):
-            RiRst = 1 + 7*np.sqrt(2)*np.pi*(eta**-0.25)/18
+            RiRst = 1 + 7*np.sqrt(2)*(eta**-0.25)/12
             psi0 = eta*(RiRst**(3./7))*(1 - RiRst**(-6./7))
         elif (self.ic2op==4):
-            RiRst = 1 + 7*np.sqrt(2)*np.pi*(eta**-0.25)/18
+            RiRst = 1 + 7*np.sqrt(2)*(eta**-0.25)/12
             psi0 = eta*(RiRst**(3./7))*(1 - RiRst**(-6./7))
             #psi0 += np.pi*(eta**3.25)/(np.sqrt(2)*(xii0**3))
             psi0 += 3*(eta**3.25)/(2*np.sqrt(2)*(xii0**3))

@@ -5,6 +5,7 @@
 import numpy as np
 from astropy import units as u
 from astropy import constants as aconsts
+import quantities
 from scipy.special import erf
 from scipy.integrate import solve_ivp
 
@@ -176,7 +177,7 @@ class TK16():
         self.sig_lnS = sig_lnS
         self.Gamma = (pdot_Mstar/(4*np.pi*aconsts.G*self.Sigma_cl)).value
 
-        self.tff0 = (np.sqrt(3*np.pi/(32*aconsts.G*self.rhobar))).to("Myr")
+        self.tff0 = quantities.Tff(self.rhobar)
 
         self.solution = self.get_solution()
 
@@ -205,7 +206,7 @@ class TK16():
             deg = -deej - dest
             return (deg, deej, dest)
         
-        # make sure to terminate integration on these events
+        # make sure to terminate integration on gas depletion
         gas_depleted.terminal = True
 
         sol = solve_ivp(derivs, [0, 500], y0, events=[gas_depleted], dense_output=True)
@@ -213,12 +214,12 @@ class TK16():
     
     def eps_gas(self, t):
         # get the gas fraction as a function of time
-        return self.solution.sol(t)[0]
+        return self.solution.sol((t/self.tff0).value)[0]
     
     def eps_ej(self, t):
         # get the ejected gas as a function of time
-        return self.solution.sol(t)[1]
+        return self.solution.sol((t/self.tff0).value)[1]
     
     def eps_star(self, t):
         # get the star formation efficiency at a given time
-        return self.solution.sol(t)[2]
+        return self.solution.sol((t/self.tff0).value)[2]

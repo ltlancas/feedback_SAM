@@ -243,7 +243,7 @@ class JointBubbleUncoupled(Bubble):
         self.tdio = quantities.Tdion(Q0, self.nbar, ci=ci, alphaB=alphaB)
         self.tff = quantities.Tff(rho0)
 
-        self.eta = self.RSt/self.Rch
+        self.eta = (self.RSt/self.Rch).to(" ").value
 
         # Separate Spitzer solution
         self.spitz_bubble = Spitzer(rho0, Q0, ci=ci, alphaB=alphaB, muH=muH)
@@ -266,7 +266,7 @@ class JointBubbleUncoupled(Bubble):
         # ic1op : the choice of initial condition for Rw/Rch
         # ic2op : the choice of initial condition for dR_i/dt
 
-        eta = self.eta.value
+        eta = self.eta
 
         # set the initial conditions
         if (self.ic1op==0):
@@ -322,7 +322,7 @@ class JointBubbleUncoupled(Bubble):
             print("Units of t are off")
             assert(False)
         ri = self.spitz_bubble.radius(t)*(t<self.teq)
-        solution =  self.joint_sol.sol(((t-self.teq)/self.tdio).value)
+        solution =  self.joint_sol.sol(((t-self.teq)/self.tdio).to(" ").value)
         ri += solution[0]*self.Rch*(t>self.teq)
         return ri.to("pc")
 
@@ -337,7 +337,7 @@ class JointBubbleUncoupled(Bubble):
         # up until teq the wind bubble follows the normal momentum-driven solution
         rw = self.wind_bubble.radius(t)*(t<self.teq)
         # afterwards it follows the joint evolution solution
-        solution =  self.joint_sol.sol(((t-self.teq)/self.tdio).value)
+        solution =  self.joint_sol.sol(((t-self.teq)/self.tdio).to(" ").value)
         xiw = self.get_xiw(solution[0])
         rw += xiw*self.Rch*(t>self.teq)
         return rw.to("pc")
@@ -352,7 +352,7 @@ class JointBubbleUncoupled(Bubble):
         
         # up until teq the ionized bubble follows the Spitzer solution
         vi = self.spitz_bubble.velocity(t)*(t<self.teq)
-        solution =  self.joint_sol.sol(((t-self.teq)/self.tdio).value)
+        solution =  self.joint_sol.sol(((t-self.teq)/self.tdio).to(" ").value)
         vi += solution[1]*self.Rch/self.tdio*(t>self.teq)
         return vi.to("km/s")
     
@@ -364,7 +364,7 @@ class JointBubbleUncoupled(Bubble):
             print("Units of t are off")
             assert(False)
         prefac = 4*np.pi*self.rho0*self.Rch**4/(3*self.tdio)
-        solution =  self.joint_sol.sol(((t-self.teq)/self.tdio).value)
+        solution =  self.joint_sol.sol(((t-self.teq)/self.tdio).to(" ").value)
         pr = prefac*solution[1]*solution[0]**3*(t>self.teq)
         pr += self.spitz_bubble.momentum(t)*(t<self.teq)
         pr += self.wind_bubble.momentum(t)*(t<self.teq)

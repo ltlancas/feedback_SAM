@@ -396,3 +396,219 @@ class JointBubbleUncoupled(Bubble):
         press = self.spitz_bubble.pressure(t)*(t<self.teq)
         press += self.pressure(t)*(t>self.teq)
         return press
+
+
+class JointBubbleCoupled(Bubble):
+    # Joint solution for the evolution of a photo-ionized gas bubble
+    # that includes an "early" phase where the bubbles are not in force balance
+    # with one another
+    def __init__(self, rho0, Q0, Mdotw, Vwind,
+                 ci = 10*u.km/u.s, alphaB = 3.11e-13*(u.cm**3/u.s),
+                 muH = 1.4, alphap = 1):
+        super().__init__(rho0)
+        # set parameters
+        self.Q0 = Q0
+        self.mdotw = Mdotw
+        self.vwind = Vwind
+        self.ci = ci
+        self.alphaB = alphaB
+        self.muH = muH
+        # check that the units are correct
+        t1 = u.get_physical_type(ci)=="speed"
+        t2 = u.get_physical_type(Q0)=="frequency"
+        t3 = u.get_physical_type(Mdotw*u.s)=="mass"
+        t4 = u.get_physical_type(Vwind)=="speed"
+        t5 = u.get_physical_type(alphaB)=="volumetric flow rate"
+        t6 = u.get_physical_type(muH)=="dimensionless"
+        if not(t1):
+            print("Units of ci are off")
+            assert(False)
+        if not(t2):
+            print("Units of Q0 are incorrect")
+            assert(False)
+        if not(t3):
+            print("Units of Mdotw are incorrect")
+            assert(False)
+        if not(t4):
+            print("Units of Vwind are off")
+            assert(False)
+        if not(t5):
+            print("Units of alphaB are off")
+            assert(False)
+        if not(t6):
+            print("Units of muH are off")
+            assert(False)
+
+        self.pdotw = alphap*Mdotw*Vwind
+        self.Lwind = 0.5*self.pdotw*self.vwind
+        self.nbar = rho0/(muH*aconsts.m_p)
+        self.RSt = quantities.RSt(Q0, self.nbar, alphaB=alphaB)
+        self.teq = quantities.Teq(self.pdotw, rho0, ci=ci)
+        self.Req = quantities.Req(self.pdotw, rho0, ci=ci)
+        self.Rch = quantities.Rch(Q0, self.nbar, self.pdotw, rho0, ci=ci, alphaB=alphaB)
+        self.tdio = quantities.Tdion(Q0, self.nbar, ci=ci, alphaB=alphaB)
+        self.tff = quantities.Tff(rho0)
+        self.tcool = quantities.Tcool(self.nbar, self.Lwind)
+        self.taurec0 = quantities.Tion(self.nbar,alphaB=alphaB)
+
+        self.eta = (self.RSt/self.Rch).to(" ").value
+
+
+        # reference solutions
+        self.spitz_bubble = Spitzer(rho0, Q0, ci=ci, alphaB=alphaB, muH=muH)
+        self.weaver = Weaver(rho0, self.Lwind)
+        self.mc_wind = MomentumDriven(rho0, self.pdotw)
+        
+        # call ODE integrator to get the joint evolution solution
+        self.joint_sol = self.joint_evol()
+
+
+    def joint_evol(self):
+        # Gives the solution for the joint dynamical evolution of
+        # photo-ionized gas and a wind bubble
+        # eta : the RSt/Rch ratio, free parameter of the model
+
+        eta = self.eta
+
+        Rw_init = self.weaver.radius(self.tcool)
+        dotRw_init = 0.6*Rw_init/self.tcool
+
+        xiw_init = (Rw_init/self.Rch).to(" ").value
+        Machw_init = (dotRw_init/self.ci).to(" ").value
+        mushw_init = xiw_init**3
+
+        di_init = 1.0
+        xii_init = np.cbrt(eta**3 + (xiw_init**3)*(1-Machw_init**2))
+        Machi_init = 2/np.sqrt(3)
+        y0 = [mushw_init, xiw_init, Machw_init, xii_init, Machi_init]#,di_init]
+
+        # defin the differential equations
+        def derivs(chi,y):
+            (mushw, xiw, Machw, xii, Machi) = y
+
+            # dimensionless initial recombination time
+            #trec0 = (self.taurec0/self.tdio).to(" ").value
+            #trec = trec0*(mushw*Machw**4*di**2 + di**3*(xii**3 - xiw**3))
+            # equilibrium ionization front position
+            #xii_eq = np.cbrt(xiw**3 + eta**3/(di**2) - mushw*Machw**2/di)
+            # factors needed for calculating derivatives
+            mfac = np.sqrt(3)*eta/2
+            mrat = mushw*(Machw**2)/(xii**3 - xiw**3)
+            x = np.sqrt(1 + 4*(eta**3)/mrat/(mushw*(Machw**2)))
+            # ionized gas density ratio
+            di = 0.5*mrat*(x - 1)
+            # derivatives
+            dmushw = 3*mfac*(xiw**2)*Machw*di
+            dxiw = mfac*Machw
+            dMachw = (3*mfac*(eta**1.5) - dmushw)/mushw
+            # dynamical contribution to the change in xii
+            # should be strictly positive and used for ddi below
+            dxii_dyn = mfac*Machi
+            dxii = dxii_dyn #- (xii_eq - xii)/trec
+            dMachi = 3*(mfac/xii)*(di - Machi**2)
+            # calculation of derivative of density in time
+            #ddi = 1.0
+            return (dmushw,dxiw,dMachw,dxii,dMachi)
+
+        # use solve_ivp to get solution
+        return solve_ivp(derivs,[0,100],y0,dense_output=True)
+
+
+    def radius(self, t):
+        # Returns the radius of the ionized bubble at time t
+        # t : the time
+        t1 = u.get_physical_type(t)=="time"
+        if not t1:
+            print("Units of t are off")
+            assert(False)
+        chi = (t/self.tdio).to(" ").value
+        solution =  self.joint_sol.sol(chi)
+        ri = solution[3]*self.Rch
+        return ri.to("pc")
+
+    def wind_radius(self, t):
+        # Returns the radius of the wind bubble at time t
+        # t : the time
+        t1 = u.get_physical_type(t)=="time"
+        t1 = u.get_physical_type(t)=="time"
+        if not t1:
+            print("Units of t are off")
+            assert(False)
+        chi = (t/self.tdio).to(" ").value
+        solution = self.joint_sol.sol(chi)
+        rw = solution[1]*self.Rch
+        return rw.to("pc")
+
+    def velocity(self, t):
+        # Returns the velocity of the ionized bubble at time t
+        # t : the time
+        t1 = u.get_physical_type(t)=="time"
+        if not t1:
+            print("Units of t are off")
+            assert(False)
+        chi = (t/self.tdio).to(" ").value
+        solution = self.joint_sol.sol(chi)
+        vi = solution[4]*self.Rch/self.tdio
+        return vi.to("km/s")
+    
+    def wind_velocity(self, t):
+        # Returns the velocity of the ionized bubble at time t
+        # t : the time
+        t1 = u.get_physical_type(t)=="time"
+        if not t1:
+            print("Units of t are off")
+            assert(False)
+        chi = (t/self.tdio).to(" ").value
+        solution = self.joint_sol.sol(chi)
+        vw = solution[2]*self.Rch/self.tdio
+        return vw.to("km/s")
+    
+    def momentum(self, t):
+        # returns the momentum carried by the joint bubble at time t
+        # t : the time
+        t1 = u.get_physical_type(t)=="time"
+        if not t1:
+            print("Units of t are off")
+            assert(False)
+        # prefactor on momentum calculation
+        prefac = 4*np.pi*self.rho0*self.Rch**3/(3*self.ci)
+        chi = (t/self.tdio).to(" ").value
+        solution =  self.joint_sol.sol(chi)
+        pr = prefac*(solution[0]*solution[2] - (solution[3]**3)*solution[4])
+        return pr.to("solMass*km/s")
+    
+    def pressure(self, t):
+        # returns the pressure of the wind bubble at time t
+        # t : the time
+        t1 = u.get_physical_type(t)=="time"
+        if not t1:
+            print("Units of t are off")
+            assert(False)
+        
+        press = self.pdotw/(4*np.pi*self.wind_radius(t)**2)
+        return (press/aconsts.k_B).to("K/cm3")
+
+    def rhoi(self,t):
+        # returns the density in the ionized gas bubble at time t
+        # t : the time
+        t1 = u.get_physical_type(t)=="time"
+        if not t1:
+            print("Units of t are off")
+            assert(False)
+        chi = (t/self.tdio).to(" ").value
+        solution =  self.joint_sol.sol(chi)
+        (mushw, xiw, Machw, xii, Machi) = solution
+        # factors needed for calculating derivatives
+        mrat = mushw*(Machw**2)/(xii**3 - xiw**3)
+        # ionized gas density ratio
+        di = 0.5*self.rho0*mrat*(np.sqrt(1 + 4*(self.eta**3)/mrat/(mushw*(Machw**2))) - 1)
+        return di.to("solMass/pc3")
+
+    def pressure_ionized(self, t):
+        # returns the pressure of the ionized bubble at time t
+        # t : the time
+        t1 = u.get_physical_type(t)=="time"
+        if not t1:
+            print("Units of t are off")
+            assert(False)
+        return (self.rhoi(t)*self.ci**2/aconsts.k_B).to("K/cm3")

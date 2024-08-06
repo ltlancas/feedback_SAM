@@ -575,7 +575,6 @@ class JointBubbleCoupled(Bubble):
         # use solve_ivp to get solution
         return solve_ivp(derivs,[0,100],y0,events=[wind_caught_up], dense_output=True)
 
-
     def radius(self, t):
         # Returns the radius of the ionized bubble at time t
         # t : the time
@@ -636,7 +635,19 @@ class JointBubbleCoupled(Bubble):
         prefac = 4*np.pi*self.rho0*self.Rch**3*self.ci/3
         chi = (t/self.tdio).to(" ").value
         solution =  self.joint_sol.sol(chi)
-        pr = prefac*(solution[0]*solution[2] + (solution[3]**3)*solution[4])
+        if self.dynamic_density:
+            (mushw, xiw, Machw, xii, Machi, di) = solution
+        else:
+            (mushw, xiw, Machw, xii, Machi) = solution
+            # factors needed for calculating derivatives
+            mrat = mushw*(Machw**2)/(xii**3 - xiw**3)
+            # ionized gas density ratio
+            di = 0.5*self.rho0*mrat*(np.sqrt(1 + 4*(self.eta**3)/mrat/(mushw*(Machw**2))) - 1)
+
+        prw = prefac*mushw*Machw
+        mushi = xii**3 - di*(xii**3 - xiw**3) - mushw
+        pri = prefac*mushi*Machi
+        pr = prw + pri
         return pr.to("solMass*km/s")
     
     def pressure(self, t):
@@ -660,8 +671,8 @@ class JointBubbleCoupled(Bubble):
         chi = (t/self.tdio).to(" ").value
         solution =  self.joint_sol.sol(chi)
         if self.dynamic_density:
-            (mushw, xiw, Machw, xii, Machi, ddi) = solution
-            return ddi*self.rho0
+            (mushw, xiw, Machw, xii, Machi, di) = solution
+            return (di*self.rho0).to("solMass/pc3")
         else:
             (mushw, xiw, Machw, xii, Machi) = solution
             # factors needed for calculating derivatives

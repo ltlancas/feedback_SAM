@@ -544,8 +544,8 @@ class JointBubbleCoupled(Bubble):
             (mushw, xiw, Machw, xii, Machi, di) = y
 
             # dimensionless initial recombination time
-            trec0 = (self.taurec0/self.tdio).to(" ").value
-            trec = 1./((mushw*Machw**4*di**2 + di**3*(xii**3 - xiw**3))/(trec0*eta**3))
+            chirec0 = (self.taurec0/self.tdio).to(" ").value
+            chirec = 1./((mushw*Machw**4*di**2 + di**3*(xii**3 - xiw**3))/(chirec0*eta**3))
             # equilibrium ionization front position
             xii_eq = np.cbrt(xiw**3 + eta**3/(di**2) - mushw*Machw**2/di)
             # factors needed for calculating derivatives
@@ -561,7 +561,7 @@ class JointBubbleCoupled(Bubble):
             # dynamical contribution to the change in xii
             # should be strictly positive and used for ddi below
             dxii_dyn = mfac*Machi
-            dxii = dxii_dyn - (xii_eq - xii)/trec
+            dxii = dxii_dyn + (xii_eq - xii)/chirec
             dMachi = 3*(mfac/xii)*(di - Machi**2)
             # calculation of derivative of density in time
             dmrat_dchi = dmushw/mushw + 2*dMachw/Machw
@@ -569,7 +569,7 @@ class JointBubbleCoupled(Bubble):
             dmrat_dchi *= mrat
             dx_dchi = dmushw/mushw + 2*dMachw/Machw + dmrat_dchi/mrat
             dx_dchi *= -2*(eta**3)/(x*mushw*mrat*(Machw**2))
-            ddi = 0.5*(x-1)*dmrat_dchi + 0.5*mrat*dx_dchi
+            ddi = 0.5*((x-1)*dmrat_dchi + mrat*dx_dchi)
             return (dmushw,dxiw,dMachw,dxii,dMachi,ddi)
 
         # use solve_ivp to get solution
@@ -610,7 +610,7 @@ class JointBubbleCoupled(Bubble):
             assert(False)
         chi = (t/self.tdio).to(" ").value
         solution = self.joint_sol.sol(chi)
-        vi = solution[4]*self.Rch/self.tdio
+        vi = solution[4]*self.ci
         return vi.to("km/s")
     
     def wind_velocity(self, t):
@@ -622,7 +622,7 @@ class JointBubbleCoupled(Bubble):
             assert(False)
         chi = (t/self.tdio).to(" ").value
         solution = self.joint_sol.sol(chi)
-        vw = solution[2]*self.Rch/self.tdio
+        vw = solution[2]*self.ci
         return vw.to("km/s")
     
     def momentum(self, t):
@@ -633,10 +633,10 @@ class JointBubbleCoupled(Bubble):
             print("Units of t are off")
             assert(False)
         # prefactor on momentum calculation
-        prefac = 4*np.pi*self.rho0*self.Rch**3/(3*self.ci)
+        prefac = 4*np.pi*self.rho0*self.Rch**3*self.ci/3
         chi = (t/self.tdio).to(" ").value
         solution =  self.joint_sol.sol(chi)
-        pr = prefac*(solution[0]*solution[2] - (solution[3]**3)*solution[4])
+        pr = prefac*(solution[0]*solution[2] + (solution[3]**3)*solution[4])
         return pr.to("solMass*km/s")
     
     def pressure(self, t):
@@ -659,12 +659,16 @@ class JointBubbleCoupled(Bubble):
             assert(False)
         chi = (t/self.tdio).to(" ").value
         solution =  self.joint_sol.sol(chi)
-        (mushw, xiw, Machw, xii, Machi) = solution
-        # factors needed for calculating derivatives
-        mrat = mushw*(Machw**2)/(xii**3 - xiw**3)
-        # ionized gas density ratio
-        di = 0.5*self.rho0*mrat*(np.sqrt(1 + 4*(self.eta**3)/mrat/(mushw*(Machw**2))) - 1)
-        return di.to("solMass/pc3")
+        if self.dynamic_density:
+            (mushw, xiw, Machw, xii, Machi, ddi) = solution
+            return ddi*self.rho0
+        else:
+            (mushw, xiw, Machw, xii, Machi) = solution
+            # factors needed for calculating derivatives
+            mrat = mushw*(Machw**2)/(xii**3 - xiw**3)
+            # ionized gas density ratio
+            di = 0.5*self.rho0*mrat*(np.sqrt(1 + 4*(self.eta**3)/mrat/(mushw*(Machw**2))) - 1)
+            return di.to("solMass/pc3")
 
     def pressure_ionized(self, t):
         # returns the pressure of the ionized bubble at time t

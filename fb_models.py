@@ -513,6 +513,68 @@ class JointBubbleCoupled(Bubble):
 
         # use solve_ivp to get solution
         return solve_ivp(derivs,[0,100],y0,events=[wind_caught_up], dense_output=True)
+    
+
+    def joint_evol_dd(self):
+        # dynamical evolution with the ionized gas density as a dynamical variable
+
+        eta = self.eta
+
+        Rw_init = self.weaver.radius(self.tcool)
+        dotRw_init = 0.6*Rw_init/self.tcool
+
+        xiw_init = (Rw_init/self.Rch).to(" ").value
+        Machw_init = (dotRw_init/self.ci).to(" ").value
+        mushw_init = xiw_init**3
+
+        di_init = 1.0
+        xii_init = np.cbrt(eta**3 + (xiw_init**3)*(1-Machw_init**2))
+        Machi_init = 2/np.sqrt(3)
+        y0 = [mushw_init, xiw_init, Machw_init, xii_init, Machi_init,di_init]
+
+        # conditions on which to stop this evolution
+        def wind_caught_up(t, y):
+            return y[1] - y[3]
+        
+        # make sure to terminate integration on gas depletion
+        wind_caught_up.terminal = True
+
+        # define the differential equations
+        def derivs(chi,y):
+            (mushw, xiw, Machw, xii, Machi, di) = y
+
+            # dimensionless initial recombination time
+            trec0 = (self.taurec0/self.tdio).to(" ").value
+            trec = 1./((mushw*Machw**4*di**2 + di**3*(xii**3 - xiw**3))/(trec0*eta**3))
+            # equilibrium ionization front position
+            xii_eq = np.cbrt(xiw**3 + eta**3/(di**2) - mushw*Machw**2/di)
+            # factors needed for calculating derivatives
+            mfac = np.sqrt(3)*eta/2
+            mrat = mushw*(Machw**2)/(xii**3 - xiw**3)
+            x = np.sqrt(1 + 4*(eta**3)/(mrat*mushw*(Machw**2)))
+            # ionized gas density ratio
+            di = 0.5*mrat*(x - 1)
+            # derivatives
+            dmushw = 3*mfac*(xiw**2)*Machw*di
+            dxiw = mfac*Machw
+            dMachw = (3*mfac*(eta**1.5) - Machw*dmushw)/mushw
+            # dynamical contribution to the change in xii
+            # should be strictly positive and used for ddi below
+            dxii_dyn = mfac*Machi
+            dxii = dxii_dyn - (xii_eq - xii)/trec
+            dMachi = 3*(mfac/xii)*(di - Machi**2)
+            # calculation of derivative of density in time
+            dmrat_dchi = dmushw/mushw + 2*dMachw/Machw
+            dmrat_dchi -= 3*(xii**2*dxii_dyn - xiw**2*dxiw)/(xii**3 - xiw**3)
+            dmrat_dchi *= mrat
+            dx_dchi = dmushw/mushw + 2*dMachw/Machw + dmrat_dchi/mrat
+            dx_dchi *= -2*(eta**3)/(x*mushw*mrat*(Machw**2))
+            ddi = 0.5*(x-1)*dmrat_dchi + 0.5*mrat*dx_dchi
+            return (dmushw,dxiw,dMachw,dxii,dMachi,ddi)
+
+        # use solve_ivp to get solution
+        return solve_ivp(derivs,[0,100],y0,events=[wind_caught_up], dense_output=True)
+
 
     def radius(self, t):
         # Returns the radius of the ionized bubble at time t

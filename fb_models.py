@@ -404,7 +404,9 @@ class JointBubbleCoupled(Bubble):
     # with one another
     def __init__(self, rho0, Q0, Mdotw, Vwind,
                  ci = 10*u.km/u.s, alphaB = 3.11e-13*(u.cm**3/u.s),
-                 muH = 1.4, alphap = 1):
+                 muH = 1.4, alphap = 1, dynamic_density=False):
+        # dynamic_density : whether to track the ionized gas denisty as a 
+        #    dynamical variable with it's own ODE
         super().__init__(rho0)
         # set parameters
         self.Q0 = Q0
@@ -450,6 +452,7 @@ class JointBubbleCoupled(Bubble):
         self.tff = quantities.Tff(rho0)
         self.tcool = quantities.Tcool(self.nbar, self.Lwind)
         self.taurec0 = quantities.Tion(self.nbar,alphaB=alphaB)
+        self.dynamic_density = dynamic_density
 
         self.eta = (self.RSt/self.Rch).to(" ").value
 
@@ -460,7 +463,10 @@ class JointBubbleCoupled(Bubble):
         self.mc_wind = MomentumDriven(rho0, self.pdotw)
         
         # call ODE integrator to get the joint evolution solution
-        self.joint_sol = self.joint_evol()
+        if dynamic_density:
+            self.joint_sol = self.joint_evol_dd()
+        else:
+            self.joint_sol = self.joint_evol()
 
 
     def joint_evol(self):
@@ -477,20 +483,20 @@ class JointBubbleCoupled(Bubble):
         Machw_init = (dotRw_init/self.ci).to(" ").value
         mushw_init = xiw_init**3
 
-        di_init = 1.0
         xii_init = np.cbrt(eta**3 + (xiw_init**3)*(1-Machw_init**2))
         Machi_init = 2/np.sqrt(3)
-        y0 = [mushw_init, xiw_init, Machw_init, xii_init, Machi_init]#,di_init]
+        y0 = [mushw_init, xiw_init, Machw_init, xii_init, Machi_init]
+
+        # conditions on which to stop this evolution
+        def wind_caught_up(t, y):
+            return y[1] - y[3]
+        
+        # make sure to terminate integration on gas depletion
+        wind_caught_up.terminal = True
 
         # defin the differential equations
         def derivs(chi,y):
             (mushw, xiw, Machw, xii, Machi) = y
-
-            # dimensionless initial recombination time
-            #trec0 = (self.taurec0/self.tdio).to(" ").value
-            #trec = trec0*(mushw*Machw**4*di**2 + di**3*(xii**3 - xiw**3))
-            # equilibrium ionization front position
-            #xii_eq = np.cbrt(xiw**3 + eta**3/(di**2) - mushw*Machw**2/di)
             # factors needed for calculating derivatives
             mfac = np.sqrt(3)*eta/2
             mrat = mushw*(Machw**2)/(xii**3 - xiw**3)
@@ -500,19 +506,13 @@ class JointBubbleCoupled(Bubble):
             # derivatives
             dmushw = 3*mfac*(xiw**2)*Machw*di
             dxiw = mfac*Machw
-            dMachw = (3*mfac*(eta**1.5) - dmushw)/mushw
-            # dynamical contribution to the change in xii
-            # should be strictly positive and used for ddi below
-            dxii_dyn = mfac*Machi
-            dxii = dxii_dyn #- (xii_eq - xii)/trec
+            dMachw = (3*mfac*(eta**1.5) - Machw*dmushw)/mushw
+            dxii = mfac*Machi
             dMachi = 3*(mfac/xii)*(di - Machi**2)
-            # calculation of derivative of density in time
-            #ddi = 1.0
             return (dmushw,dxiw,dMachw,dxii,dMachi)
 
         # use solve_ivp to get solution
-        return solve_ivp(derivs,[0,100],y0,dense_output=True)
-
+        return solve_ivp(derivs,[0,100],y0,events=[wind_caught_up], dense_output=True)
 
     def radius(self, t):
         # Returns the radius of the ionized bubble at time t

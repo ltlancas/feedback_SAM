@@ -492,6 +492,13 @@ class JointBubbleCoupled(Bubble):
 
         self.joint_sol = self.joint_evol(xiw, Mi0_transition)
 
+    def get_xiw(self, xii):
+        xiw = []
+        for xi in xii:
+            p = [1.0, 1.0, 0., 0., -1*(xi**3)]
+            xiw.append(np.real(np.roots(p)[-1]))
+        return np.array(xiw)
+
     def joint_evol(self,xiw0,psi0):
         # Gives the solution for the joint dynamical evolution of
         # photo-ionized gas and a wind bubble
@@ -656,7 +663,7 @@ class JointBubbleCoupled(Bubble):
             print("Units of t are off")
             assert(False)
         chi = (t/self.tdio).to(" ").value
-        solution =  self.joint_sol.sol(chi)
+        solution =  self.early_sol.sol(chi)
         ri = solution[3]*self.Rch
         return ri.to("pc")
 
@@ -669,7 +676,7 @@ class JointBubbleCoupled(Bubble):
             print("Units of t are off")
             assert(False)
         chi = (t/self.tdio).to(" ").value
-        solution = self.joint_sol.sol(chi)
+        solution = self.early_sol.sol(chi)
         rw = solution[1]*self.Rch
         return rw.to("pc")
 
@@ -681,7 +688,7 @@ class JointBubbleCoupled(Bubble):
             print("Units of t are off")
             assert(False)
         chi = (t/self.tdio).to(" ").value
-        solution = self.joint_sol.sol(chi)
+        solution = self.early_sol.sol(chi)
         vi = solution[4]*self.ci
         return vi.to("km/s")
     
@@ -693,7 +700,7 @@ class JointBubbleCoupled(Bubble):
             print("Units of t are off")
             assert(False)
         chi = (t/self.tdio).to(" ").value
-        solution = self.joint_sol.sol(chi)
+        solution = self.early_sol.sol(chi)
         vw = solution[2]*self.ci
         return vw.to("km/s")
     
@@ -707,7 +714,7 @@ class JointBubbleCoupled(Bubble):
         # prefactor on momentum calculation
         prefac = 4*np.pi*self.rho0*self.Rch**3*self.ci/3
         chi = (t/self.tdio).to(" ").value
-        solution =  self.joint_sol.sol(chi)
+        solution =  self.early_sol.sol(chi)
         if self.dynamic_density:
             (mushw, xiw, Machw, xii, Machi, di) = solution
         else:
@@ -743,7 +750,7 @@ class JointBubbleCoupled(Bubble):
             print("Units of t are off")
             assert(False)
         chi = (t/self.tdio).to(" ").value
-        solution =  self.joint_sol.sol(chi)
+        solution =  self.early_sol.sol(chi)
         if self.dynamic_density:
             (mushw, xiw, Machw, xii, Machi, di) = solution
             return (di*self.rho0).to("solMass/pc3")

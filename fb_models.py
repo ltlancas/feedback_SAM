@@ -520,7 +520,7 @@ class JointBubbleCoupled(Bubble):
             return (dmushw,dxiw,dMachw,dxii,dMachi)
 
         # use solve_ivp to get solution
-        return solve_ivp(derivs,[0,100],y0,events=[wind_caught_up], dense_output=True)
+        return solve_ivp(derivs,[0,100],y0,events=[wind_caught_up, teq_reached, wind_subsonic], dense_output=True)
     
 
     def joint_evol_dd(self):
@@ -589,7 +589,7 @@ class JointBubbleCoupled(Bubble):
             return (dmushw,dxiw,dMachw,dxii,dMachi,ddi)
 
         # use solve_ivp to get solution
-        return solve_ivp(derivs,[0,100],y0,events=[wind_caught_up], dense_output=True)
+        return solve_ivp(derivs,[0,100],y0,events=[wind_caught_up, teq_reached, wind_subsonic], dense_output=True)
 
     def radius(self, t):
         # Returns the radius of the ionized bubble at time t
@@ -657,8 +657,9 @@ class JointBubbleCoupled(Bubble):
             (mushw, xiw, Machw, xii, Machi) = solution
             # factors needed for calculating derivatives
             mrat = mushw*(Machw**2)/(xii**3 - xiw**3)
+            x = np.sqrt(1 + 4*(self.eta**3)/(mrat*mushw*(Machw**2)))
             # ionized gas density ratio
-            di = 0.5*self.rho0*mrat*(np.sqrt(1 + 4*(self.eta**3)/mrat/(mushw*(Machw**2))) - 1)
+            di = 0.5*mrat*(x - 1)
 
         prw = prefac*mushw*Machw
         mushi = xii**3 - di*(xii**3 - xiw**3) - mushw
@@ -693,8 +694,9 @@ class JointBubbleCoupled(Bubble):
             (mushw, xiw, Machw, xii, Machi) = solution
             # factors needed for calculating derivatives
             mrat = mushw*(Machw**2)/(xii**3 - xiw**3)
+            x = np.sqrt(1 + 4*(self.eta**3)/(mrat*mushw*(Machw**2)))
             # ionized gas density ratio
-            di = 0.5*self.rho0*mrat*(np.sqrt(1 + 4*(self.eta**3)/mrat/(mushw*(Machw**2))) - 1)
+            di = 0.5*self.rho0*mrat*(x - 1)
             return di.to("solMass/pc3")
 
     def pressure_ionized(self, t):

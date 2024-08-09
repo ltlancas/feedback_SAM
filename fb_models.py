@@ -488,11 +488,19 @@ class JointBubbleCoupled(Bubble):
         y0 = [mushw_init, xiw_init, Machw_init, xii_init, Machi_init]
 
         # conditions on which to stop this evolution
-        def wind_caught_up(t, y):
+        def wind_caught_up(chi, y):
             return y[1] - y[3]
+
+        def teq_reached(chi, y):
+            return chi - np.sqrt(2)*(eta**-0.25)/3
         
+        def wind_subsonic(chi, y):
+            return y[2] - 1.0
+
         # make sure to terminate integration on gas depletion
         wind_caught_up.terminal = True
+        teq_reached.terminal = True
+        wind_subsonic.terminal = True
 
         # defin the differential equations
         def derivs(chi,y):
@@ -537,7 +545,7 @@ class JointBubbleCoupled(Bubble):
             return y[1] - y[3]
 
         def teq_reached(chi, y):
-            return chi - (self.teq/self.tdio).to(" ").value
+            return chi - np.sqrt(2)*(eta**-0.25)/3
         
         def wind_subsonic(chi, y):
             return y[2] - 1.0

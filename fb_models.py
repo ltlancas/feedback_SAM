@@ -514,13 +514,12 @@ class JointBubbleCoupled(Bubble):
 
         # define the differential equations
         def derivs(chi,y):
-            xii = y[0]
-            psi = y[1]
+            (xii,Machi) = y
             xiw = np.interp(xii,xii_range,xiw_prec)
             mfac = np.sqrt(3)*eta/2
             t1 = (3*mfac*(eta**1.5)*(1 + xiw)**(2./3))/(xii**3)
-            t2 = 3*mfac*(psi**2)/xii
-            return (psi,t1-t2)
+            t2 = 3*mfac*(Machi**2)/xii
+            return (mfac*Machi,t1-t2)
 
         # use solve_ivp to get solution
         return solve_ivp(derivs,[0,100],[xii0,psi0],dense_output=True)

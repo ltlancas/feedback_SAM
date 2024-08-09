@@ -464,15 +464,59 @@ class JointBubbleCoupled(Bubble):
         
         # call ODE integrator to get the joint evolution solution
         if dynamic_density:
-            self.joint_sol = self.early_evol_dd()
+            self.early_sol = self.early_evol_dd()
         else:
-            self.joint_sol = self.early_evol()
+            self.early_sol = self.early_evol()
 
         # when we transition between early evolution and joint evolution
-        for event in self.joint_sol.t_events:
+        for event in self.early_sol.t_events:
             if (len(event) != 0):
                 self.t_transition = (event[0]*self.tdio).to(u.Myr)
+        
+        sol_transition = self.early_sol.sol((self.t_transition/self.tdio).to(" ").value)
+        # get total momentum at transition time
+        if self.dynamic_density:
+            (mushw, xiw, Machw, xii, Machi, di) = sol_transition
+        else:
+            (mushw, xiw, Machw, xii, Machi) = sol_transition
+            # factors needed for calculating derivatives
+            mrat = mushw*(Machw**2)/(xii**3 - xiw**3)
+            x = np.sqrt(1 + 4*(self.eta**3)/(mrat*mushw*(Machw**2)))
+            # ionized gas density ratio
+            di = 0.5*mrat*(x - 1)
+        self.xii_transition = xii
+        self.xiw_transition = xiw
+        # initial condition for velocity on joint evolution
+        # based on keeping the same momentum
+        Mi0_transition = (mushw*Machw + xii**3 - di*(xii**3 - xiw**3) - mushw)/xii**3
 
+        self.joint_sol = self.joint_evol(xiw, Mi0_transition)
+
+    def joint_evol(self,xiw0,psi0):
+        # Gives the solution for the joint dynamical evolution of
+        # photo-ionized gas and a wind bubble
+        # eta : the RSt/Rch ratio, free parameter of the model
+
+        eta = self.eta
+        # get xii0 from xiw0
+        xii0 = xiw0*((1+xiw0)**(1./3))
+
+        # pre-calculate the relationship between xii and xiw
+        xii_range = np.linspace(xii0/2,100*xii0,1000)
+        xiw_prec = self.get_xiw(xii_range)
+
+        # define the differential equations
+        def derivs(chi,y):
+            xii = y[0]
+            psi = y[1]
+            xiw = np.interp(xii,xii_range,xiw_prec)
+            mfac = np.sqrt(3)*eta/2
+            t1 = (3*mfac*(eta**1.5)*(1 + xiw)**(2./3))/(xii**3)
+            t2 = 3*mfac*(psi**2)/xii
+            return (psi,t1-t2)
+
+        # use solve_ivp to get solution
+        return solve_ivp(derivs,[0,100],[xii0,psi0],dense_output=True)
 
     def early_evol(self):
         # Gives the solution for the joint dynamical evolution of

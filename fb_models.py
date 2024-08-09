@@ -463,10 +463,7 @@ class JointBubbleCoupled(Bubble):
         self.mc_wind = MomentumDriven(rho0, self.pdotw)
         
         # call ODE integrator to get the joint evolution solution
-        if dynamic_density:
-            self.early_sol = self.early_evol_dd()
-        else:
-            self.early_sol = self.early_evol()
+        self.early_sol = self.early_evol()
 
         # when we transition between early evolution and joint evolution
         for event in self.early_sol.t_events:
@@ -526,7 +523,8 @@ class JointBubbleCoupled(Bubble):
 
     def early_evol(self):
         # Gives the solution for the joint dynamical evolution of
-        # photo-ionized gas and a wind bubble
+        # photo-ionized gas and a wind bubble at early times
+        # before they are in force balance with each other
         # eta : the RSt/Rch ratio, free parameter of the model
 
         eta = self.eta
@@ -540,77 +538,34 @@ class JointBubbleCoupled(Bubble):
 
         xii_init = np.cbrt(eta**3 + (xiw_init**3)*(1-Machw_init**2))
         Machi_init = 2/np.sqrt(3)
-        y0 = [mushw_init, xiw_init, Machw_init, xii_init, Machi_init]
+        if self.dynamic_density:
+            di_init = 1.0
+            y0 = [mushw_init, xiw_init, Machw_init, xii_init, Machi_init, di_init]
+        else:
+            y0 = [mushw_init, xiw_init, Machw_init, xii_init, Machi_init]
 
-        # conditions on which to stop this evolution
+        # conditions on which to stop the evolution
         def wind_caught_up(chi, y):
+            # wind radius reaches ionized gas radius
+            # this really shouldn't happen
             return y[1] - y[3]
 
         def peq_reached(chi, y):
             # pressure equilibrium between wind and photo-ionized gas
-            (mushw, xiw, Machw, xii, Machi) = y
-            mrat = mushw*(Machw**2)/(xii**3 - xiw**3)
-            x = np.sqrt(1 + 4*(eta**3)/mrat/(mushw*(Machw**2)))
-            # ionized gas density ratio
-            di = 0.5*mrat*(x - 1)
-            return di - eta**1.5/xiw**2
+            if self.dynamic_density:
+                (mushw, xiw, Machw, xii, Machi, di) = y
+                return di - eta**1.5/xiw**2
+            else:
+                (mushw, xiw, Machw, xii, Machi) = y
+                mrat = mushw*(Machw**2)/(xii**3 - xiw**3)
+                x = np.sqrt(1 + 4*(eta**3)/mrat/(mushw*(Machw**2)))
+                # ionized gas density ratio
+                di = 0.5*mrat*(x - 1)
+                return di - eta**1.5/xiw**2
         
         def wind_subsonic(chi, y):
-            return y[2] - 1.0
-
-        # make sure to terminate integration on gas depletion
-        wind_caught_up.terminal = True
-        peq_reached.terminal = True
-        wind_subsonic.terminal = True
-
-        # defin the differential equations
-        def derivs(chi,y):
-            (mushw, xiw, Machw, xii, Machi) = y
-            # factors needed for calculating derivatives
-            mfac = np.sqrt(3)*eta/2
-            mrat = mushw*(Machw**2)/(xii**3 - xiw**3)
-            x = np.sqrt(1 + 4*(eta**3)/mrat/(mushw*(Machw**2)))
-            # ionized gas density ratio
-            di = 0.5*mrat*(x - 1)
-            # derivatives
-            dmushw = 3*mfac*(xiw**2)*Machw*di
-            dxiw = mfac*Machw
-            dMachw = (3*mfac*(eta**1.5) - Machw*dmushw)/mushw
-            dxii = mfac*Machi
-            dMachi = 3*(mfac/xii)*(di - Machi**2)
-            return (dmushw,dxiw,dMachw,dxii,dMachi)
-
-        # use solve_ivp to get solution
-        return solve_ivp(derivs,[0,100],y0,events=[wind_caught_up, peq_reached, wind_subsonic], dense_output=True)
-    
-
-    def early_evol_dd(self):
-        # dynamical evolution with the ionized gas density as a dynamical variable
-
-        eta = self.eta
-
-        Rw_init = self.weaver.radius(self.tcool)
-        dotRw_init = 0.6*Rw_init/self.tcool
-
-        xiw_init = (Rw_init/self.Rch).to(" ").value
-        Machw_init = (dotRw_init/self.ci).to(" ").value
-        mushw_init = xiw_init**3
-
-        di_init = 1.0
-        xii_init = np.cbrt(eta**3 + (xiw_init**3)*(1-Machw_init**2))
-        Machi_init = 2/np.sqrt(3)
-        y0 = [mushw_init, xiw_init, Machw_init, xii_init, Machi_init,di_init]
-
-        # conditions on which to stop this evolution
-        def wind_caught_up(chi, y):
-            return y[1] - y[3]
-
-        def peq_reached(chi, y):
-            # pressure equilibrium between wind and photo-ionized gas
-            (mushw, xiw, Machw, xii, Machi, di) = y
-            return di - eta**1.5/xiw**2
-        
-        def wind_subsonic(chi, y):
+            # wind bubble's expansion becomes subsonic in the 
+            # photo-ionized gas
             return y[2] - 1.0
 
         # make sure to terminate integration on gas depletion
@@ -620,36 +575,41 @@ class JointBubbleCoupled(Bubble):
 
         # define the differential equations
         def derivs(chi,y):
-            (mushw, xiw, Machw, xii, Machi, di) = y
-
-            # dimensionless initial recombination time
-            chirec0 = (self.taurec0/self.tdio).to(" ").value
-            chirec = 1./((mushw*Machw**4*di**2 + di**3*(xii**3 - xiw**3))/(chirec0*eta**3))
-            # equilibrium ionization front position
-            xii_eq = np.cbrt(xiw**3 + eta**3/(di**2) - mushw*Machw**2/di)
+            if self.dynamic_density:
+                (mushw, xiw, Machw, xii, Machi, di) = y
+            else:
+                (mushw, xiw, Machw, xii, Machi) = y
             # factors needed for calculating derivatives
             mfac = np.sqrt(3)*eta/2
             mrat = mushw*(Machw**2)/(xii**3 - xiw**3)
-            x = np.sqrt(1 + 4*(eta**3)/(mrat*mushw*(Machw**2)))
+            x = np.sqrt(1 + 4*(eta**3)/mrat/(mushw*(Machw**2)))
             # ionized gas density ratio
-            di = 0.5*mrat*(x - 1)
+            if not(self.dynamic_density):
+                di = 0.5*mrat*(x - 1)
             # derivatives
             dmushw = 3*mfac*(xiw**2)*Machw*di
             dxiw = mfac*Machw
             dMachw = (3*mfac*(eta**1.5) - Machw*dmushw)/mushw
-            # dynamical contribution to the change in xii
-            # should be strictly positive and used for ddi below
-            dxii_dyn = mfac*Machi
-            dxii = dxii_dyn + (xii_eq - xii)/chirec
             dMachi = 3*(mfac/xii)*(di - Machi**2)
-            # calculation of derivative of density in time
-            dmrat_dchi = dmushw/mushw + 2*dMachw/Machw
-            dmrat_dchi -= 3*(xii**2*dxii_dyn - xiw**2*dxiw)/(xii**3 - xiw**3)
-            dmrat_dchi *= mrat
-            dx_dchi = dmushw/mushw + 2*dMachw/Machw + dmrat_dchi/mrat
-            dx_dchi *= -2*(eta**3)/(x*mushw*mrat*(Machw**2))
-            ddi = 0.5*((x-1)*dmrat_dchi + mrat*dx_dchi)
-            return (dmushw,dxiw,dMachw,dxii,dMachi,ddi)
+            dxii_dyn = mfac*Machi
+            if self.dynamic_density:
+                # dimensionless initial recombination time
+                chirec0 = (self.taurec0/self.tdio).to(" ").value
+                chirec = 1./((mushw*Machw**4*di**2 + di**3*(xii**3 - xiw**3))/(chirec0*eta**3))
+                # equilibrium ionization front position
+                xii_eq = np.cbrt(xiw**3 + eta**3/(di**2) - mushw*Machw**2/di)
+                dxii = dxii_dyn + (xii_eq - xii)/chirec
+                # calculation of derivative of density in time
+                dmrat_dchi = dmushw/mushw + 2*dMachw/Machw
+                dmrat_dchi -= 3*(xii**2*dxii_dyn - xiw**2*dxiw)/(xii**3 - xiw**3)
+                dmrat_dchi *= mrat
+                dx_dchi = dmushw/mushw + 2*dMachw/Machw + dmrat_dchi/mrat
+                dx_dchi *= -2*(eta**3)/(x*mushw*mrat*(Machw**2))
+                ddi = 0.5*((x-1)*dmrat_dchi + mrat*dx_dchi)
+                return (dmushw,dxiw,dMachw,dxii,dMachi,ddi)
+            else:
+                dxii = dxii_dyn
+                return (dmushw,dxiw,dMachw,dxii,dMachi)
 
         # use solve_ivp to get solution
         return solve_ivp(derivs,[0,100],y0,events=[wind_caught_up, peq_reached, wind_subsonic], dense_output=True)

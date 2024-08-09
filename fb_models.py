@@ -464,12 +464,17 @@ class JointBubbleCoupled(Bubble):
         
         # call ODE integrator to get the joint evolution solution
         if dynamic_density:
-            self.joint_sol = self.joint_evol_dd()
+            self.joint_sol = self.early_evol_dd()
         else:
-            self.joint_sol = self.joint_evol()
+            self.joint_sol = self.early_evol()
+
+        # when we transition between early evolution and joint evolution
+        for event in self.joint_sol.t_events:
+            if (len(event) != 0):
+                self.t_transition = (event[0]*self.tdio).to(u.Myr)
 
 
-    def joint_evol(self):
+    def early_evol(self):
         # Gives the solution for the joint dynamical evolution of
         # photo-ionized gas and a wind bubble
         # eta : the RSt/Rch ratio, free parameter of the model
@@ -491,15 +496,21 @@ class JointBubbleCoupled(Bubble):
         def wind_caught_up(chi, y):
             return y[1] - y[3]
 
-        def teq_reached(chi, y):
-            return chi - np.sqrt(2)*(eta**-0.25)/3
+        def peq_reached(chi, y):
+            # pressure equilibrium between wind and photo-ionized gas
+            (mushw, xiw, Machw, xii, Machi) = y
+            mrat = mushw*(Machw**2)/(xii**3 - xiw**3)
+            x = np.sqrt(1 + 4*(eta**3)/mrat/(mushw*(Machw**2)))
+            # ionized gas density ratio
+            di = 0.5*mrat*(x - 1)
+            return di - eta**1.5/xiw**2
         
         def wind_subsonic(chi, y):
             return y[2] - 1.0
 
         # make sure to terminate integration on gas depletion
         wind_caught_up.terminal = True
-        teq_reached.terminal = True
+        peq_reached.terminal = True
         wind_subsonic.terminal = True
 
         # defin the differential equations
@@ -520,10 +531,10 @@ class JointBubbleCoupled(Bubble):
             return (dmushw,dxiw,dMachw,dxii,dMachi)
 
         # use solve_ivp to get solution
-        return solve_ivp(derivs,[0,100],y0,events=[wind_caught_up, teq_reached, wind_subsonic], dense_output=True)
+        return solve_ivp(derivs,[0,100],y0,events=[wind_caught_up, peq_reached, wind_subsonic], dense_output=True)
     
 
-    def joint_evol_dd(self):
+    def early_evol_dd(self):
         # dynamical evolution with the ionized gas density as a dynamical variable
 
         eta = self.eta
@@ -544,15 +555,17 @@ class JointBubbleCoupled(Bubble):
         def wind_caught_up(chi, y):
             return y[1] - y[3]
 
-        def teq_reached(chi, y):
-            return chi - np.sqrt(2)*(eta**-0.25)/3
+        def peq_reached(chi, y):
+            # pressure equilibrium between wind and photo-ionized gas
+            (mushw, xiw, Machw, xii, Machi, di) = y
+            return di - eta**1.5/xiw**2
         
         def wind_subsonic(chi, y):
             return y[2] - 1.0
 
         # make sure to terminate integration on gas depletion
         wind_caught_up.terminal = True
-        teq_reached.terminal = True
+        peq_reached.terminal = True
         wind_subsonic.terminal = True
 
         # define the differential equations
@@ -589,7 +602,7 @@ class JointBubbleCoupled(Bubble):
             return (dmushw,dxiw,dMachw,dxii,dMachi,ddi)
 
         # use solve_ivp to get solution
-        return solve_ivp(derivs,[0,100],y0,events=[wind_caught_up, teq_reached, wind_subsonic], dense_output=True)
+        return solve_ivp(derivs,[0,100],y0,events=[wind_caught_up, peq_reached, wind_subsonic], dense_output=True)
 
     def radius(self, t):
         # Returns the radius of the ionized bubble at time t

@@ -485,7 +485,9 @@ class JointBubbleCoupled(Bubble):
         self.xiw_transition = xiw
         # initial condition for velocity on joint evolution
         # based on keeping the same momentum
-        Mi0_transition = (mushw*Machw + xii**3 - di*(xii**3 - xiw**3) - mushw)/xii**3
+        mushi_transition =  xii**3 - di*(xii**3 - xiw**3) - mushw
+        Mi0_transition = (mushw*Machw + mushi_transition*Machi)/xii**3
+        print(xiw, xii, xiw*((1+xiw)**(1./3)))
 
         self.joint_sol = self.joint_evol(xiw, Mi0_transition)
 
@@ -496,7 +498,7 @@ class JointBubbleCoupled(Bubble):
             xiw.append(np.real(np.roots(p)[-1]))
         return np.array(xiw)
 
-    def joint_evol(self,xiw0,psi0):
+    def joint_evol(self,xiw0,Machi0):
         # Gives the solution for the joint dynamical evolution of
         # photo-ionized gas and a wind bubble
         # eta : the RSt/Rch ratio, free parameter of the model
@@ -519,7 +521,7 @@ class JointBubbleCoupled(Bubble):
             return (mfac*Machi,t1-t2)
 
         # use solve_ivp to get solution
-        return solve_ivp(derivs,[0,100],[xii0,psi0],dense_output=True)
+        return solve_ivp(derivs,[0,100],[xii0,Machi0],dense_output=True)
 
     def early_evol(self):
         # Gives the solution for the joint dynamical evolution of
@@ -621,9 +623,12 @@ class JointBubbleCoupled(Bubble):
         if not t1:
             print("Units of t are off")
             assert(False)
-        chi = (t/self.tdio).to(" ").value
-        solution =  self.early_sol.sol(chi)
-        ri = solution[3]*self.Rch
+        echi = (t/self.tdio).to(" ").value
+        esol =  self.early_sol.sol(echi)
+        jchi = ((t-self.t_transition)/self.tdio).to(" ").value
+        jsol = self.joint_sol.sol(jchi)
+        ri = esol[3]*self.Rch*(t<self.t_transition)
+        ri += jsol[0]*self.Rch*(t>=self.t_transition)
         return ri.to("pc")
 
     def wind_radius(self, t):
@@ -634,9 +639,12 @@ class JointBubbleCoupled(Bubble):
         if not t1:
             print("Units of t are off")
             assert(False)
-        chi = (t/self.tdio).to(" ").value
-        solution = self.early_sol.sol(chi)
-        rw = solution[1]*self.Rch
+        echi = (t/self.tdio).to(" ").value
+        esol = self.early_sol.sol(echi)
+        jchi = ((t-self.t_transition)/self.tdio).to(" ").value
+        jsol = self.joint_sol.sol(jchi)
+        rw = esol[1]*self.Rch*(t<self.t_transition)
+        rw += self.get_xiw(jsol[0])*self.Rch*(t>=self.t_transition)
         return rw.to("pc")
 
     def velocity(self, t):
@@ -646,9 +654,12 @@ class JointBubbleCoupled(Bubble):
         if not t1:
             print("Units of t are off")
             assert(False)
-        chi = (t/self.tdio).to(" ").value
-        solution = self.early_sol.sol(chi)
-        vi = solution[4]*self.ci
+        echi = (t/self.tdio).to(" ").value
+        esol = self.early_sol.sol(echi)
+        jchi = ((t-self.t_transition)/self.tdio).to(" ").value
+        jsol = self.joint_sol.sol(jchi)
+        vi = esol[4]*self.ci*(t<self.t_transition)
+        vi += jsol[1]*self.ci*(t>=self.t_transition)
         return vi.to("km/s")
     
     def wind_velocity(self, t):
@@ -658,9 +669,9 @@ class JointBubbleCoupled(Bubble):
         if not t1:
             print("Units of t are off")
             assert(False)
-        chi = (t/self.tdio).to(" ").value
-        solution = self.early_sol.sol(chi)
-        vw = solution[2]*self.ci
+        echi = (t/self.tdio).to(" ").value
+        esol = self.early_sol.sol(echi)
+        vw = esol[2]*self.ci
         return vw.to("km/s")
     
     def momentum(self, t):

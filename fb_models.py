@@ -288,10 +288,10 @@ class JointBubbleUncoupled(Bubble):
             psi0 = 3*(eta**3.25)/(2*np.sqrt(2)*(xii0**3))
         elif (self.ic2op==3):
             RiRst = 1 + 7*np.sqrt(2)*(eta**-0.25)/12
-            psi0 = eta*(RiRst**(3./7))*(1 - RiRst**(-6./7))
+            psi0 = (eta**4)*(RiRst**(9./7))*(1 - RiRst**(-6./7))/(xii0**3)
         elif (self.ic2op==4):
             RiRst = 1 + 7*np.sqrt(2)*(eta**-0.25)/12
-            psi0 = eta*(RiRst**(3./7))*(1 - RiRst**(-6./7))
+            psi0 = (eta**4)*(RiRst**(9./7))*(1 - RiRst**(-6./7))/(xii0**3)
             psi0 += 3*(eta**3.25)/(2*np.sqrt(2)*(xii0**3))
         else:
             print("Bad option for initial condition 2")
@@ -487,7 +487,7 @@ class JointBubbleCoupled(Bubble):
         # based on keeping the same momentum
         mushi_transition =  xii**3 - di*(xii**3 - xiw**3) - mushw
         Mi0_transition = (mushw*Machw + mushi_transition*Machi)/xii**3
-        print(xiw, xii, xiw*((1+xiw)**(1./3)))
+        #print(xiw, xii, xiw*((1+xiw)**(1./3)))
 
         self.joint_sol = self.joint_evol(xiw, Mi0_transition)
 

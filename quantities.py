@@ -58,6 +58,31 @@ def Req(pdotw, rhobar, ci = 10*u.km/u.s):
 
     return r_eq.to("pc")
 
+def Req_Weaver(Lwind, rhobar, ci = 10*u.km/u.s):
+    # Returns the equilbration radius
+    # pdotw : wind momentum input rate
+    # rhobar : background mass density
+    # ci : ionized gas sound speed
+
+    # start by making sure that the dimensions of the arguments are correct
+    t1 = u.get_physical_type(Lwind)=="power"
+    t2 = u.get_physical_type(rhobar)=="mass density"
+    t3 = u.get_physical_type(ci)=="speed"
+    if not(t1):
+        print("Units of Lwind are incorrect")
+        assert(False)
+    if not(t2):
+        print("Units of rhobar are off")
+        assert(False)
+    if not(t3):
+        print("Units of ci are off")
+        assert(False)
+
+    prefac = np.sqrt(7)/(22*np.pi)
+    r_eq = (prefac*Lwind/(rhobar*(ci**3)))**(1./2)
+
+    return r_eq.to("pc")
+
 def Rch(Q0, nbar, pdotw, rhobar, ci = 10*u.km/u.s, alphaB = 3.11e-13*(u.cm**3/u.s)):
     # gives the characteristic radius at which the force from photo-ionized gas
     # is equal to that of the wind bubble, defined using the relationship 
@@ -197,6 +222,32 @@ def Teq(pdotw, rhobar, ci = 10*u.km/u.s):
         assert(False)
 
     t_eq = (((3*pdotw/(2*np.pi*rhobar))**(1./2)))/(6*ci**2)
+
+    return t_eq.to("Myr")
+
+def Teq_Weaver(Lwind, rhobar, ci = 10*u.km/u.s):
+    # gives the time it takes to reach Req
+    # pdotw : wind momentum input rate
+    # rhobar : background mass density
+    # ci : ionized gas sound speed
+
+    # start by making sure that the dimensions of the arguments are correct
+    t1 = u.get_physical_type(Lwind)=="power"
+    t2 = u.get_physical_type(rhobar)=="mass density"
+    t3 = u.get_physical_type(ci)=="speed"
+    if not(t1):
+        print("Units of Lwind are incorrect")
+        assert(False)
+    if not(t2):
+        print("Units of rhobar are off")
+        assert(False)
+    if not(t3):
+        print("Units of ci are off")
+        assert(False)
+
+    prefac = 0.2*(7**0.75)/((22*np.pi)**0.5)
+
+    t_eq = prefac*(Lwind/(rhobar*(ci**5)))**(1./2)
 
     return t_eq.to("Myr")
 

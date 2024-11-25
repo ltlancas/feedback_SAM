@@ -106,7 +106,6 @@ class Spitzer(Bubble):
 
         return (press_sp/aconsts.k_B).to("K/cm3")
 
-
 class Weaver(Bubble):
     # Weaver solution for a wind bubble
     def __init__(self, rho0, Lwind):
@@ -196,7 +195,7 @@ class MomentumDriven(Bubble):
 ################################# JOINT EVOLUTION MODELS ################################
 #########################################################################################
 
-class JointBubbleUncoupled(Bubble):
+class JointBubbleMDUncoupled(Bubble):
     # Joint solution for the evolution of a photo-ionized gas bubble
     # and a wind bubble in force balance with each other
     # assumes that the bubbles are uncoupled and evolve independently
@@ -237,8 +236,8 @@ class JointBubbleUncoupled(Bubble):
 
         self.nbar = rho0/(muH*aconsts.m_p)
         self.RSt = quantities.RSt(Q0, self.nbar, alphaB=alphaB)
-        self.teq = quantities.Teq(pdotw, rho0, ci=ci)
-        self.Req = quantities.Req(pdotw, rho0, ci=ci)
+        self.teq = quantities.Teq_MD(pdotw, rho0, ci=ci)
+        self.Req = quantities.Req_MD(pdotw, rho0, ci=ci)
         self.Rch = quantities.Rch(Q0, self.nbar, pdotw, rho0, ci=ci, alphaB=alphaB)
         self.tdio = quantities.Tdion(Q0, self.nbar, ci=ci, alphaB=alphaB)
         self.tff = quantities.Tff(rho0)
@@ -445,8 +444,8 @@ class JointBubbleCoupled(Bubble):
         self.Lwind = 0.5*self.pdotw*self.vwind
         self.nbar = rho0/(muH*aconsts.m_p)
         self.RSt = quantities.RSt(Q0, self.nbar, alphaB=alphaB)
-        self.teq = quantities.Teq(self.pdotw, rho0, ci=ci)
-        self.Req = quantities.Req(self.pdotw, rho0, ci=ci)
+        self.teq = quantities.Teq_MD(self.pdotw, rho0, ci=ci)
+        self.Req = quantities.Req_MD(self.pdotw, rho0, ci=ci)
         self.Rch = quantities.Rch(Q0, self.nbar, self.pdotw, rho0, ci=ci, alphaB=alphaB)
         self.tdio = quantities.Tdion(Q0, self.nbar, ci=ci, alphaB=alphaB)
         self.tff = quantities.Tff(rho0)

@@ -91,7 +91,7 @@ def Rch(Q0, nbar, pdotw, rhobar, ci = 10*u.km/u.s, alphaB = 3.11e-13*(u.cm**3/u.
     # Rch = Req^4 / RSt^3 and the above relations
     # no need to check for units as that is done above
 
-    r_ch = Req(pdotw,rhobar, ci=ci)**4 / RSt(Q0, nbar,alphaB=alphaB)**3
+    r_ch = Req_MD(pdotw,rhobar, ci=ci)**4 / RSt(Q0, nbar,alphaB=alphaB)**3
     return r_ch.to("pc")
 
 def Rwshock(Mdotw, rhobar, Vwind):

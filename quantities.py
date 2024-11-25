@@ -34,8 +34,9 @@ def RSt(Q0, nbar, alphaB = 3.11e-13*(u.cm**3/u.s)):
     
     return r_st.to("pc")
 
-def Req(pdotw, rhobar, ci = 10*u.km/u.s):
-    # Returns the equilbration radius
+def Req_MD(pdotw, rhobar, ci = 10*u.km/u.s):
+    # Returns the equilibration radius
+    # for a momentum-driven solution
     # pdotw : wind momentum input rate
     # rhobar : background mass density
     # ci : ionized gas sound speed
@@ -58,9 +59,10 @@ def Req(pdotw, rhobar, ci = 10*u.km/u.s):
 
     return r_eq.to("pc")
 
-def Req_Weaver(Lwind, rhobar, ci = 10*u.km/u.s):
-    # Returns the equilbration radius
-    # pdotw : wind momentum input rate
+def Req_ED(Lwind, rhobar, ci = 10*u.km/u.s):
+    # Returns the equilibration radius
+    # for an energy-driven solution
+    # Lwind : wind luminosity
     # rhobar : background mass density
     # ci : ionized gas sound speed
 
@@ -93,7 +95,8 @@ def Rch(Q0, nbar, pdotw, rhobar, ci = 10*u.km/u.s, alphaB = 3.11e-13*(u.cm**3/u.
     return r_ch.to("pc")
 
 def Rwshock(Mdotw, rhobar, Vwind):
-    # gives the wind shock radius
+    # gives the radius at which the inertia of the swept-up surrounding material is
+    # comparable to the wind and the wind shocks
     # Mdotw : wind mass loss rate
     # rhobar : background mass density
     # Vwind : wind velocity
@@ -201,8 +204,9 @@ def Tff(rhobar):
 
     return t_ff.to("Myr")
 
-def Teq(pdotw, rhobar, ci = 10*u.km/u.s):
+def Teq_MD(pdotw, rhobar, ci = 10*u.km/u.s):
     # gives the time it takes to reach Req
+    # if following a momentum-driven solution
     # pdotw : wind momentum input rate
     # rhobar : background mass density
     # ci : ionized gas sound speed
@@ -225,9 +229,10 @@ def Teq(pdotw, rhobar, ci = 10*u.km/u.s):
 
     return t_eq.to("Myr")
 
-def Teq_Weaver(Lwind, rhobar, ci = 10*u.km/u.s):
-    # gives the time it takes to reach Req
-    # pdotw : wind momentum input rate
+def Teq_ED(Lwind, rhobar, ci = 10*u.km/u.s):
+    # gives the time it takes to reach equilibrium
+    # if following an energy-driven solution
+    # Lwind : wind luminosity
     # rhobar : background mass density
     # ci : ionized gas sound speed
 

@@ -201,8 +201,7 @@ class JointBubbleMDUncoupled(Bubble):
     # assumes that the bubbles are uncoupled and evolve independently
     # up until t_eq, the equilibration time
     def __init__(self, rho0, Q0, pdotw,
-                 ci = 10*u.km/u.s, alphaB = 3.11e-13*(u.cm**3/u.s),
-                 muH = 1.4, ic1op = 0, ic2op = 4):
+                 ci = 10*u.km/u.s, alphaB = 3.11e-13*(u.cm**3/u.s), muH = 1.4):
         super().__init__(rho0)
         # set parameters
         self.Q0 = Q0
@@ -210,8 +209,6 @@ class JointBubbleMDUncoupled(Bubble):
         self.ci = ci
         self.alphaB = alphaB
         self.muH = muH
-        self.ic1op = ic1op
-        self.ic2op = ic2op
         # check that the units are correct
         t1 = u.get_physical_type(ci)=="speed"
         t2 = u.get_physical_type(Q0)=="frequency"
@@ -241,8 +238,9 @@ class JointBubbleMDUncoupled(Bubble):
         self.Rch = quantities.Rch(Q0, self.nbar, pdotw, rho0, ci=ci, alphaB=alphaB)
         self.tdio = quantities.Tdion(Q0, self.nbar, ci=ci, alphaB=alphaB)
         self.tff = quantities.Tff(rho0)
+        self.pscl = ((4*np.pi/3)*rho0*(self.Req**4)/self.tdio).to("solMass*km/s")
 
-        self.eta = (self.RSt/self.Rch).to(" ").value
+        self.eta = (self.Req/self.RSt).to(" ").value
 
         # Separate Spitzer solution
         self.spitz_bubble = Spitzer(rho0, Q0, ci=ci, alphaB=alphaB, muH=muH)
@@ -254,47 +252,22 @@ class JointBubbleMDUncoupled(Bubble):
     def get_xiw(self, xii):
         xiw = []
         for xi in xii:
-            p = [1.0, 1.0, 0., 0., -1*(xi**3)]
+            p = [self.eta**-3, 1.0, 0., 0., -1*(xi**3)]
             xiw.append(np.real(np.roots(p)[-1]))
         return np.array(xiw)
 
     def joint_evol(self):
         # Gives the solution for the joint dynamical evolution of
         # photo-ionized gas and a wind bubble
-        # eta : the RSt/Rch ratio, free parameter of the model
-        # ic1op : the choice of initial condition for Rw/Rch
-        # ic2op : the choice of initial condition for dR_i/dt
+        # eta : the Req/RSt ratio, free parameter of the model
 
         eta = self.eta
 
-        # set the initial conditions
-        if (self.ic1op==0):
-            xiw0 = eta**0.75
-        elif (self.ic1op==1):
-            xiw0 = eta**1.5
-        else:
-            print("Bad option for initial condition 1")
-            assert(False)
-        
-        xii0 = xiw0*((1+xiw0)**(1./3))
-
-        # initial condition for derivative, psi
-        if (self.ic2op==0):
-            psi0 = 0
-        elif (self.ic2op==1):
-            psi0 = eta
-        elif (self.ic2op==2):
-            psi0 = 3*(eta**3.25)/(2*np.sqrt(2)*(xii0**3))
-        elif (self.ic2op==3):
-            RiRst = 1 + 7*np.sqrt(2)*(eta**-0.25)/12
-            psi0 = (eta**4)*(RiRst**(9./7))*(1 - RiRst**(-6./7))/(xii0**3)
-        elif (self.ic2op==4):
-            RiRst = 1 + 7*np.sqrt(2)*(eta**-0.25)/12
-            psi0 = (eta**4)*(RiRst**(9./7))*(1 - RiRst**(-6./7))/(xii0**3)
-            psi0 += 3*(eta**3.25)/(2*np.sqrt(2)*(xii0**3))
-        else:
-            print("Bad option for initial condition 2")
-            assert(False)
+        xiw0 = 1
+        xii0 = ((1+(eta**-3))**(1./3))
+        momentum_tot = self.wind_bubble.momentum(self.teq) + self.spitz_bubble.momentum(self.teq)
+        mass_tot = 4*np.pi*self.rho0*((self.Req*xii0)**3)/3
+        psi0 = (((momentum_tot/mass_tot)*(self.tdio/self.Req)).to(" ")).value
 
         # pre-calculate the relationship between xii and xiw
         xii_range = np.linspace(xii0/2,100*xii0,1000)
@@ -305,7 +278,7 @@ class JointBubbleMDUncoupled(Bubble):
             xii = y[0]
             psi = y[1]
             xiw = np.interp(xii,xii_range,xiw_prec)
-            t1 = (2.25*(eta**3.5)*(1 + xiw)**(2./3))/(xii**3)
+            t1 = (2.25*(eta**-2)*(1 + (eta**-3)*xiw)**(2./3))/(xii**3)
             t2 = 3*(psi**2)/xii
             return (psi,t1-t2)
 
@@ -323,7 +296,7 @@ class JointBubbleMDUncoupled(Bubble):
         ri = self.spitz_bubble.radius(t)*(t<self.teq)
         chi = ((t-self.teq)/self.tdio).to(" ").value
         solution =  self.joint_sol.sol(chi)
-        ri += solution[0]*self.Rch*(t>self.teq)
+        ri += solution[0]*self.Req*(t>self.teq)
         return ri.to("pc")
 
     def wind_radius(self, t):
@@ -340,7 +313,7 @@ class JointBubbleMDUncoupled(Bubble):
         chi = ((t-self.teq)/self.tdio).to(" ").value
         solution =  self.joint_sol.sol(chi)
         xiw = self.get_xiw(solution[0])
-        rw += xiw*self.Rch*(t>self.teq)
+        rw += xiw*self.Req*(t>self.teq)
         return rw.to("pc")
 
     def velocity(self, t):
@@ -355,7 +328,7 @@ class JointBubbleMDUncoupled(Bubble):
         vi = self.spitz_bubble.velocity(t)*(t<self.teq)
         chi = ((t-self.teq)/self.tdio).to(" ").value
         solution =  self.joint_sol.sol(chi)
-        vi += solution[1]*self.Rch/self.tdio*(t>self.teq)
+        vi += solution[1]*self.Req/self.tdio*(t>self.teq)
         return vi.to("km/s")
     
     def momentum(self, t):
@@ -365,7 +338,7 @@ class JointBubbleMDUncoupled(Bubble):
         if not t1:
             print("Units of t are off")
             assert(False)
-        prefac = 4*np.pi*self.rho0*self.Rch**4/(3*self.tdio)
+        prefac = self.pscl
         chi = ((t-self.teq)/self.tdio).to(" ").value
         solution =  self.joint_sol.sol(chi)
         pr = prefac*solution[1]*solution[0]**3*(t>self.teq)

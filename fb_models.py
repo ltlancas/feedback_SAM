@@ -145,7 +145,7 @@ class Weaver(Bubble):
         if not t1:
             print("Units of t are off")
             assert(False)
-        press_we = (10./33)*self.Lwind*self.t/((4*np.pi/3)*self.radius(t)**3)
+        press_we = (10./33)*self.Lwind*t/((4*np.pi/3)*self.radius(t)**3)
         return (press_we/aconsts.k_B).to("K/cm3")
     
 class MomentumDriven(Bubble):
@@ -345,6 +345,18 @@ class JointBubbleMDUncoupled(Bubble):
         pr += self.spitz_bubble.momentum(t)*(t<self.teq)
         pr += self.wind_bubble.momentum(t)*(t<self.teq)
         return pr.to("solMass*km/s")
+
+    def momentum_uncoupled(self, t):
+        # returns the momentum carried by the joint bubble at time t
+        # if the two constituent bubbles evolved independently
+        # t : the time
+        t1 = u.get_physical_type(t)=="time"
+        if not t1:
+            print("Units of t are off")
+            assert(False)
+        pr = self.spitz_bubble.momentum(t)
+        pr += self.wind_bubble.momentum(t)
+        return pr.to("solMass*km/s")
     
     def pressure(self, t):
         # returns the pressure of the wind bubble at time t
@@ -356,6 +368,193 @@ class JointBubbleMDUncoupled(Bubble):
         
         press = self.pdotw/(4*np.pi*self.wind_radius(t)**2)
         return (press/aconsts.k_B).to("K/cm3")
+    
+    def pressure_ionized(self, t):
+        # returns the pressure of the ionized bubble at time t
+        # t : the time
+        t1 = u.get_physical_type(t)=="time"
+        if not t1:
+            print("Units of t are off")
+            assert(False)
+        
+        press = self.spitz_bubble.pressure(t)*(t<self.teq)
+        press += self.pressure(t)*(t>self.teq)
+        return press
+
+class JointBubbleEDUncoupled(Bubble):
+    # Joint solution for the evolution of a photo-ionized gas bubble
+    # and a wind bubble in force balance with each other
+    # assumes that the bubbles are uncoupled and evolve independently
+    # up until t_eq, the equilibration time
+    def __init__(self, rho0, Q0, Lwind,
+                 ci = 10*u.km/u.s, alphaB = 3.11e-13*(u.cm**3/u.s), muH = 1.4):
+        super().__init__(rho0)
+        # set parameters
+        self.Q0 = Q0
+        self.Lwind = Lwind
+        self.ci = ci
+        self.alphaB = alphaB
+        self.muH = muH
+        # check that the units are correct
+        t1 = u.get_physical_type(ci)=="speed"
+        t2 = u.get_physical_type(Q0)=="frequency"
+        t3 = u.get_physical_type(Lwind)=="power"
+        t4 = u.get_physical_type(alphaB)=="volumetric flow rate"
+        t5 = u.get_physical_type(muH)=="dimensionless"
+        if not(t1):
+            print("Units of ci are off")
+            assert(False)
+        if not(t2):
+            print("Units of Q0 are incorrect")
+            assert(False)
+        if not(t3):
+            print("Units of pdotw are incorrect")
+            assert(False)
+        if not(t4):
+            print("Units of alphaB are off")
+            assert(False)
+        if not(t5):
+            print("Units of muH are off")
+            assert(False)
+
+        self.nbar = rho0/(muH*aconsts.m_p)
+        self.RSt = quantities.RSt(Q0, self.nbar, alphaB=alphaB)
+        self.teq = quantities.Teq_ED(Lwind, rho0, ci=ci)
+        self.Req = quantities.Req_ED(Lwind, rho0, ci=ci)
+        self.tdio = quantities.Tdion(Q0, self.nbar, ci=ci, alphaB=alphaB)
+        self.tff = quantities.Tff(rho0)
+        self.pscl = ((4*np.pi/3)*rho0*(self.Req**4)/self.tdio).to("solMass*km/s")
+
+        self.eta = (self.Req/self.RSt).to(" ").value
+
+        # Separate Spitzer solution
+        self.spitz_bubble = Spitzer(rho0, Q0, ci=ci, alphaB=alphaB, muH=muH)
+        # separate momentum-driven wind bubble
+        self.wind_bubble = Weaver(rho0, Lwind)
+        # call ODE integrator to get the joint evolution solution
+        self.joint_sol = self.joint_evol()
+
+    def joint_evol(self):
+        # Gives the solution for the joint dynamical evolution of
+        # photo-ionized gas and a wind bubble
+        # eta : the Req/RSt ratio, free parameter of the model
+
+        eta = self.eta
+
+        xiw0 = 1
+        xii0 = ((1+(eta**-3))**(1./3))
+        Et0 = (2./11)*np.sqrt(7./3)*eta
+        momentum_tot = self.wind_bubble.momentum(self.teq) + self.spitz_bubble.momentum(self.teq)
+        mass_tot = 4*np.pi*self.rho0*((self.Req*xii0)**3)/3
+        Mi0 = (((momentum_tot/mass_tot)/self.ci).to(" ")).value
+
+
+        # defin the differential equations
+        def derivs(chi,y):
+            (xii,Mi,xiw,Et) = y
+            Pt = (11./2)*np.sqrt(3/7)*Et*(xiw**-3)/eta
+            A = 2/(3*((xiw*eta)**3)*(Pt**2))
+            dlnxii_dchi = (2/np.sqrt(3))*Mi/xii
+
+            dxii_dchi = dlnxii_dchi*xii
+            dMi_dchi = (3*np.sqrt(3)/(2*eta*xii))*(Pt - Mi**2)
+            dlnxiw_dchi = (((xii/xiw)**3)*dlnxii_dchi + A/Et)/(1 + 5*A)
+            dxiw_dchi = dlnxiw_dchi*xiw
+            dlnEt_chi = 1./Et - 2*dlnxiw_dchi
+            dEt_dchi = dlnEt_chi*Et
+            return (dxii_dchi,dMi_dchi,dxiw_dchi,dEt_dchi)
+
+        # use solve_ivp to get solution
+        return solve_ivp(derivs,[0,100],[xii0,Mi0,xiw0,Et0],dense_output=True)
+
+
+    def radius(self, t):
+        # Returns the radius of the ionized bubble at time t
+        # t : the time
+        t1 = u.get_physical_type(t)=="time"
+        if not t1:
+            print("Units of t are off")
+            assert(False)
+        ri = self.spitz_bubble.radius(t)*(t<self.teq)
+        chi = ((t-self.teq)/self.tdio).to(" ").value
+        solution =  self.joint_sol.sol(chi)
+        ri += solution[0]*self.Req*(t>self.teq)
+        return ri.to("pc")
+
+    def wind_radius(self, t):
+        # Returns the radius of the wind bubble at time t
+        # t : the time
+        t1 = u.get_physical_type(t)=="time"
+        if not t1:
+            print("Units of t are off")
+            assert(False)
+        
+        # up until teq the wind bubble follows the normal momentum-driven solution
+        rw = self.wind_bubble.radius(t)*(t<self.teq)
+        # afterwards it follows the joint evolution solution
+        chi = ((t-self.teq)/self.tdio).to(" ").value
+        solution =  self.joint_sol.sol(chi)
+        xiw = solution[2]
+        rw += xiw*self.Req*(t>self.teq)
+        return rw.to("pc")
+
+    def velocity(self, t):
+        # Returns the velocity of the ionized bubble at time t
+        # t : the time
+        t1 = u.get_physical_type(t)=="time"
+        if not t1:
+            print("Units of t are off")
+            assert(False)
+        
+        # up until teq the ionized bubble follows the Spitzer solution
+        vi = self.spitz_bubble.velocity(t)*(t<self.teq)
+        chi = ((t-self.teq)/self.tdio).to(" ").value
+        solution =  self.joint_sol.sol(chi)
+        vi += solution[1]*self.ci*(t>self.teq)
+        return vi.to("km/s")
+    
+    def momentum(self, t):
+        # returns the momentum carried by the joint bubble at time t
+        # t : the time
+        t1 = u.get_physical_type(t)=="time"
+        if not t1:
+            print("Units of t are off")
+            assert(False)
+        prefac = (4*np.pi/3)*self.Req**3*self.rho0*self.ci
+        chi = ((t-self.teq)/self.tdio).to(" ").value
+        solution =  self.joint_sol.sol(chi)
+        pr = prefac*solution[1]*solution[0]**3*(t>self.teq)
+        pr += self.spitz_bubble.momentum(t)*(t<self.teq)
+        pr += self.wind_bubble.momentum(t)*(t<self.teq)
+        return pr.to("solMass*km/s")
+
+    def momentum_uncoupled(self, t):
+        # returns the momentum carried by the joint bubble at time t
+        # if the two constituent bubbles evolved independently
+        # t : the time
+        t1 = u.get_physical_type(t)=="time"
+        if not t1:
+            print("Units of t are off")
+            assert(False)
+        pr = self.spitz_bubble.momentum(t)
+        pr += self.wind_bubble.momentum(t)
+        return pr.to("solMass*km/s")
+    
+    def pressure(self, t):
+        # returns the pressure of the wind bubble at time t
+        # t : the time
+        t1 = u.get_physical_type(t)=="time"
+        if not t1:
+            print("Units of t are off")
+            assert(False)
+        
+        press = self.wind_bubble.pressure(t)*(t<self.teq)
+        chi = ((t-self.teq)/self.tdio).to(" ").value
+        solution =  self.joint_sol.sol(chi)
+        Pt = (11./2)*np.sqrt(3/7)*solution[3]*(solution[2]**-3)/self.eta
+        Pt = Pt*self.rho0*self.ci**2
+        press += Pt*(t>self.teq)/aconsts.k_B
+        return (press).to("K/cm3")
     
     def pressure_ionized(self, t):
         # returns the pressure of the ionized bubble at time t

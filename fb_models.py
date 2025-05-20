@@ -63,7 +63,7 @@ class Spitzer(Bubble):
             setattr(self, key, value)
         
         if "Q0" not in self.__dict__:
-            self.Q0 = 1e49/u.s
+            self.Q0 = 1e50/u.s
         if "ci" not in self.__dict__:
             self.ci = 10*u.km/u.s
         if "alphaB" not in self.__dict__:
@@ -164,7 +164,7 @@ class MomentumDriven(Bubble):
             setattr(self, key, value)
 
         if "pdotw" not in self.__dict__:
-            self.pdotw = 1e4*u.Msun*u.km/u.s/u.Myr
+            self.pdotw = 1e5*u.Msun*u.km/u.s/u.Myr
 
     def _check_parameter_units(self):
         t1 = u.get_physical_type(self.pdotw)=="force"
@@ -222,9 +222,9 @@ class MD_CEM(Bubble):
             setattr(self, key, value)
 
         if "Q0" not in self.__dict__:
-            self.Q0 = 1e49/u.s
+            self.Q0 = 1e50/u.s
         if "pdotw" not in self.__dict__:
-            self.pdotw = 1e4*u.Msun*u.km/u.s/u.Myr
+            self.pdotw = 1e5*u.Msun*u.km/u.s/u.Myr
         if "ci" not in self.__dict__:
             self.ci = 10*u.km/u.s
         if "alphaB" not in self.__dict__:
@@ -395,7 +395,7 @@ class ED_CEM(Bubble):
             setattr(self, key, value)
 
         if "Q0" not in self.__dict__:
-            self.Q0 = 1e49/u.s
+            self.Q0 = 1e50/u.s
         if "Lwind" not in self.__dict__:
             self.Lwind = 1e38*u.erg/u.s
         if "ci" not in self.__dict__:

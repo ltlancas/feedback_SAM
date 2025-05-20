@@ -21,14 +21,11 @@ def RSt(Q0, nbar, alphaB = 3.11e-13*(u.cm**3/u.s)):
     t2 = u.get_physical_type(nbar)=="number density"
     t3 = u.get_physical_type(alphaB)=="volumetric flow rate"
     if not(t1):
-        print("Units of Q0 are incorrect")
-        assert(False)
+        raise ValueError("Units of Q0 are incorrect")
     if not(t2):
-        print("Units of nbar are off")
-        assert(False)
+        raise ValueError("Units of nbar are incorrect")
     if not(t3):
-        print("Units of alphaB are off")
-        assert(False)
+        raise ValueError("Units of alphaB are incorrect")
     
     r_st = (3*Q0/(4*np.pi*nbar**2*alphaB))**(1./3)
     
@@ -46,14 +43,11 @@ def Req_MD(pdotw, rhobar, ci = 10*u.km/u.s):
     t2 = u.get_physical_type(rhobar)=="mass density"
     t3 = u.get_physical_type(ci)=="speed"
     if not(t1):
-        print("Units of pdotw are incorrect")
-        assert(False)
+        raise ValueError("Units of pdotw are incorrect")
     if not(t2):
-        print("Units of rhobar are off")
-        assert(False)
+        raise ValueError("Units of rhobar are incorrect")
     if not(t3):
-        print("Units of ci are off")
-        assert(False)
+        raise ValueError("Units of ci are incorrect")
 
     r_eq = (pdotw/(4*np.pi*rhobar*ci**2))**(1./2)
 
@@ -71,14 +65,11 @@ def Req_ED(Lwind, rhobar, ci = 10*u.km/u.s):
     t2 = u.get_physical_type(rhobar)=="mass density"
     t3 = u.get_physical_type(ci)=="speed"
     if not(t1):
-        print("Units of Lwind are incorrect")
-        assert(False)
+        raise ValueError("Units of Lwind are incorrect")
     if not(t2):
-        print("Units of rhobar are off")
-        assert(False)
+        raise ValueError("Units of rhobar are incorrect")
     if not(t3):
-        print("Units of ci are off")
-        assert(False)
+        raise ValueError("Units of ci are incorrect")
 
     prefac = np.sqrt(7)/(22*np.pi)
     r_eq = (prefac*Lwind/(rhobar*(ci**3)))**(1./2)
@@ -106,14 +97,11 @@ def Rwshock(Mdotw, rhobar, Vwind):
     t2 = u.get_physical_type(rhobar)=="mass density"
     t3 = u.get_physical_type(Vwind)=="speed"
     if not(t1):
-        print("Units of Mdotw are incorrect")
-        assert(False)
+        raise ValueError("Units of Mdotw are incorrect")
     if not(t2):
-        print("Units of rhobar are off")
-        assert(False)
+        raise ValueError("Units of rhobar are incorrect")
     if not(t3):
-        print("Units of Vwind are off")
-        assert(False)
+        raise ValueError("Units of Vwind are incorrect")
 
     r_wshock = (Mdotw/(4*np.pi*rhobar*Vwind))**(1./2)
 
@@ -130,14 +118,11 @@ def Rcl(Mcl, nbar, muH = 1.4):
     t2 = u.get_physical_type(nbar)=="number density"
     t3 = u.get_physical_type(muH)=="dimensionless"
     if not(t1):
-        print("Units of Mcl are incorrect")
-        assert(False)
+        raise ValueError("Units of Mcl are incorrect")
     if not(t2):
-        print("Units of nbar are off")
-        assert(False)
+        raise ValueError("Units of nbar are incorrect")
     if not(t3):
-        print("Units of muH are off")
-        assert(False)
+        raise ValueError("Units of muH are incorrect")
 
     r_cl = (3*Mcl/(4*np.pi*nbar*muH*aconsts.m_p))**(1./3)
 
@@ -181,11 +166,9 @@ def Tion(nbar, alphaB=3.11e-13*(u.cm**3/u.s)):
     t1 = u.get_physical_type(nbar)=="number density"
     t2 = u.get_physical_type(alphaB)=="volumetric flow rate"
     if not(t1):
-        print("Units of nbar are off")
-        assert(False)
+        raise ValueError("Units of nbar are incorrect")
     if not(t2):
-        print("Units of alphaB are off")
-        assert(False)
+        raise ValueError("Units of alphaB are incorrect")
 
     t_ion = (nbar*alphaB)**-1
 
@@ -197,8 +180,7 @@ def Tff(rhobar):
 
     t1 = u.get_physical_type(rhobar)=="mass density"
     if not(t1):
-        print("Units of rhobar are off")
-        assert(False)
+        raise ValueError("Units of rhobar are incorrect")
     
     t_ff = (3*np.pi/(32*aconsts.G*rhobar))**(1./2)
 
@@ -216,14 +198,11 @@ def Teq_MD(pdotw, rhobar, ci = 10*u.km/u.s):
     t2 = u.get_physical_type(rhobar)=="mass density"
     t3 = u.get_physical_type(ci)=="speed"
     if not(t1):
-        print("Units of pdotw are incorrect")
-        assert(False)
+        raise ValueError("Units of pdotw are incorrect")
     if not(t2):
-        print("Units of rhobar are off")
-        assert(False)
+        raise ValueError("Units of rhobar are incorrect")
     if not(t3):
-        print("Units of ci are off")
-        assert(False)
+        raise ValueError("Units of ci are incorrect")
 
     t_eq = (((3*pdotw/(2*np.pi*rhobar))**(1./2)))/(6*ci**2)
 
@@ -241,14 +220,11 @@ def Teq_ED(Lwind, rhobar, ci = 10*u.km/u.s):
     t2 = u.get_physical_type(rhobar)=="mass density"
     t3 = u.get_physical_type(ci)=="speed"
     if not(t1):
-        print("Units of Lwind are incorrect")
-        assert(False)
+        raise ValueError("Units of Lwind are incorrect")
     if not(t2):
-        print("Units of rhobar are off")
-        assert(False)
+        raise ValueError("Units of rhobar are incorrect")
     if not(t3):
-        print("Units of ci are off")
-        assert(False)
+        raise ValueError("Units of ci are incorrect")
 
     prefac = 0.2*(7**0.75)/((22*np.pi)**0.5)
 
@@ -256,9 +232,9 @@ def Teq_ED(Lwind, rhobar, ci = 10*u.km/u.s):
 
     return t_eq.to("Myr")
 
-def TSt(Q0, nbar, pdotw, rhobar, ci = 10*u.km/u.s, alphaB = 3.11e-13*(u.cm**3/u.s)):
-    # time at which an unimpeded wind bubble would reach the Stromgren Radius
-    # parameters defined as above
+def TSt_MD(Q0, nbar, pdotw, rhobar, ci = 10*u.km/u.s, alphaB = 3.11e-13*(u.cm**3/u.s)):
+    # time at which an unimpeded momentum-driven wind bubble would reach
+    # the Stromgren Radius parameters defined as above
 
     # get the stromgren radius
     r_st = RSt(Q0,nbar,alphaB=alphaB)
@@ -267,14 +243,11 @@ def TSt(Q0, nbar, pdotw, rhobar, ci = 10*u.km/u.s, alphaB = 3.11e-13*(u.cm**3/u.
     t2 = u.get_physical_type(rhobar)=="mass density"
     t3 = u.get_physical_type(ci)=="speed"
     if not(t1):
-        print("Units of pdotw are incorrect")
-        assert(False)
+        raise ValueError("Units of pdotw are incorrect")
     if not(t2):
-        print("Units of rhobar are off")
-        assert(False)
+        raise ValueError("Units of rhobar are incorrect")
     if not(t3):
-        print("Units of ci are off")
-        assert(False)
+        raise ValueError("Units of ci are incorrect")
     
     t_st = (r_st**2)*(2*np.pi*rhobar/(3*pdotw))**(1./2)
 
@@ -288,8 +261,7 @@ def Tdion(Q0, nbar, ci = 10*u.km/u.s, alphaB = 3.11e-13*(u.cm**3/u.s)):
 
     t1 = u.get_physical_type(ci)=="speed"
     if not(t1):
-        print("Units of ci are off")
-        assert(False)
+        raise ValueError("Units of ci are incorrect")
     
     t_di = np.sqrt(3)*r_st/(2*ci)
 

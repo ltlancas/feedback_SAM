@@ -4,7 +4,7 @@
 
 import numpy as np
 from astropy import units as u
-from astropy import constants as aconsts
+from astropy import constants as ac
 import quantities
 from scipy.integrate import solve_ivp
 
@@ -22,7 +22,7 @@ class Bubble():
             setattr(self, key, value)
 
         if "rho0" not in self.__dict__:
-            self.rho0 = 140*aconsts.m_p/(u.cm**3)
+            self.rho0 = 140*ac.m_p/(u.cm**3)
 
     def _check_parameter_units(self):
         t1 = u.get_physical_type(rho0)=="mass density"
@@ -54,7 +54,7 @@ class Spitzer(Bubble):
         self._set_parmeters(**kwargs)
         self._check_parameter_units()
 
-        self.nbar = rho0/(muH*aconsts.m_p)
+        self.nbar = self.rho0/(self.muH*ac.m_p)
         self.RSt = quantities.RSt(self.Q0, self.nbar, alphaB=self.alphaB)
         self.tdio = quantities.Tdion(self.Q0, self.nbar, ci=self.ci, alphaB=self.alphaB)
 
@@ -111,7 +111,7 @@ class Spitzer(Bubble):
     def pressure(self, t):
         self._check_time_units(t)
         press_sp = self.rhoi(t)*self.ci**2
-        return (press_sp/aconsts.k_B).to("K/cm3")
+        return (press_sp/ac.k_B).to("K/cm3")
 
 class Weaver(Bubble):
     # Weaver solution for a wind bubble
@@ -150,7 +150,7 @@ class Weaver(Bubble):
     def pressure(self, t):
         self._check_time_units(t)
         press_we = (10./33)*self.Lwind*t/((4*np.pi/3)*self.radius(t)**3)
-        return (press_we/aconsts.k_B).to("K/cm3")
+        return (press_we/ac.k_B).to("K/cm3")
     
 class MomentumDriven(Bubble):
     # Momentum-driven bubble solution
@@ -189,7 +189,7 @@ class MomentumDriven(Bubble):
     def pressure(self, t):
         self._check_time_units(t)
         press_md = self.pdotw/(4*np.pi*self.radius(t)**2)
-        return (press_md/aconsts.k_B).to("K/cm3")
+        return (press_md/ac.k_B).to("K/cm3")
 
 
 #########################################################################################
@@ -202,7 +202,7 @@ class MD_CEM(Bubble):
     # assumes that the bubbles are uncoupled and evolve independently
     # up until t_eq, the equilibration time
     def __init__(self, **kwargs):
-        super().__init__(rho0)
+        super().__init__(**kwargs)
         self._set_parmeters(**kwargs)
         self._check_parameter_units()
         self._set_derived_parameters()
@@ -234,11 +234,11 @@ class MD_CEM(Bubble):
 
     def _check_parameter_units(self):
         # check that the units are correct
-        t1 = u.get_physical_type(ci)=="speed"
-        t2 = u.get_physical_type(Q0)=="frequency"
-        t3 = u.get_physical_type(pdotw)=="force"
-        t4 = u.get_physical_type(alphaB)=="volumetric flow rate"
-        t5 = u.get_physical_type(muH)=="dimensionless"
+        t1 = u.get_physical_type(self.ci)=="speed"
+        t2 = u.get_physical_type(self.Q0)=="frequency"
+        t3 = u.get_physical_type(self.pdotw)=="force"
+        t4 = u.get_physical_type(self.alphaB)=="volumetric flow rate"
+        t5 = u.get_physical_type(self.muH)=="dimensionless"
         if not(t1):
             raise ValueError("Units of ci are incorrect")
         if not(t2):
@@ -253,7 +253,7 @@ class MD_CEM(Bubble):
     def _set_derived_parameters(self):
         (ci, alphaB, muH) = (self.ci, self.alphaB, self.muH)
         (Q0, pdotw, rho0) = (self.Q0, self.pdotw, self.rho0)
-        self.nbar = rho0/(muH*aconsts.m_p)
+        self.nbar = rho0/(muH*ac.m_p)
         self.RSt = quantities.RSt(Q0, self.nbar, alphaB=alphaB)
         self.teq = quantities.Teq_MD(pdotw, rho0, ci=ci)
         self.Req = quantities.Req_MD(pdotw, rho0, ci=ci)
@@ -359,7 +359,7 @@ class MD_CEM(Bubble):
         # t : the time
         self._check_time_units(t)
         press = self.pdotw/(4*np.pi*self.wind_radius(t)**2)
-        return (press/aconsts.k_B).to("K/cm3")
+        return (press/ac.k_B).to("K/cm3")
     
     def pressure_ionized(self, t):
         # returns the pressure of the ionized bubble at time t
@@ -407,11 +407,11 @@ class ED_CEM(Bubble):
 
     def _check_parameter_units(self):
         # check that the units are correct
-        t1 = u.get_physical_type(ci)=="speed"
-        t2 = u.get_physical_type(Q0)=="frequency"
-        t3 = u.get_physical_type(Lwind)=="power"
-        t4 = u.get_physical_type(alphaB)=="volumetric flow rate"
-        t5 = u.get_physical_type(muH)=="dimensionless"
+        t1 = u.get_physical_type(self.ci)=="speed"
+        t2 = u.get_physical_type(self.Q0)=="frequency"
+        t3 = u.get_physical_type(self.Lwind)=="power"
+        t4 = u.get_physical_type(self.alphaB)=="volumetric flow rate"
+        t5 = u.get_physical_type(self.muH)=="dimensionless"
         if not(t1):
             raise ValueError("Units of ci are incorrect")
         if not(t2):
@@ -427,7 +427,7 @@ class ED_CEM(Bubble):
     def _set_derived_parameters(self):
         (ci, alphaB, muH) = (self.ci, self.alphaB, self.muH)
         (Q0, Lwind, rho0) = (self.Q0, self.Lwind, self.rho0)
-        self.nbar = rho0/(muH*aconsts.m_p)
+        self.nbar = rho0/(muH*ac.m_p)
         self.RSt = quantities.RSt(Q0, self.nbar, alphaB=alphaB)
         self.teq = quantities.Teq_ED(Lwind, rho0, ci=ci)
         self.Req = quantities.Req_ED(Lwind, rho0, ci=ci)
@@ -536,7 +536,7 @@ class ED_CEM(Bubble):
         solution =  self.joint_sol.sol(chi)
         Pt = (11./2)*np.sqrt(3/7)*solution[3]*(solution[2]**-3)/self.eta
         Pt = Pt*self.rho0*self.ci**2
-        press += Pt*(t>self.teq)/aconsts.k_B
+        press += Pt*(t>self.teq)/ac.k_B
         return (press).to("K/cm3")
     
     def pressure_ionized(self, t):

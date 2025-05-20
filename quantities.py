@@ -235,10 +235,6 @@ def Teq_ED(Lwind, rhobar, ci = 10*u.km/u.s):
 def TSt_MD(Q0, nbar, pdotw, rhobar, ci = 10*u.km/u.s, alphaB = 3.11e-13*(u.cm**3/u.s)):
     # time at which an unimpeded momentum-driven wind bubble would reach
     # the Stromgren Radius parameters defined as above
-
-    # get the stromgren radius
-    r_st = RSt(Q0,nbar,alphaB=alphaB)
-
     t1 = u.get_physical_type(pdotw)=="force"
     t2 = u.get_physical_type(rhobar)=="mass density"
     t3 = u.get_physical_type(ci)=="speed"
@@ -249,8 +245,30 @@ def TSt_MD(Q0, nbar, pdotw, rhobar, ci = 10*u.km/u.s, alphaB = 3.11e-13*(u.cm**3
     if not(t3):
         raise ValueError("Units of ci are incorrect")
     
-    t_st = (r_st**2)*(2*np.pi*rhobar/(3*pdotw))**(1./2)
+    r_st = RSt(Q0,nbar,alphaB=alphaB)
+    r_eq = Req_MD(pdotw, rhobar, ci=ci)
+    t_eq = Teq_MD(pdotw, rhobar, ci=ci)
+    t_st = t_eq*(r_st/r_eq)**(2)
 
+    return t_st.to("Myr")
+
+def TSt_ED(Q0, nbar, Lwind, rhobar, ci = 10*u.km/u.s, alphaB = 3.11e-13*(u.cm**3/u.s)):
+    # time at which an unimpeded energy-driven wind bubble would reach
+    # the Stromgren Radius parameters defined as above
+    t1 = u.get_physical_type(pdotw)=="force"
+    t2 = u.get_physical_type(Lwind)=="power"
+    t3 = u.get_physical_type(ci)=="speed"
+    if not(t1):
+        raise ValueError("Units of pdotw are incorrect")
+    if not(t2):
+        raise ValueError("Units of Lwind are incorrect")
+    if not(t3):
+        raise ValueError("Units of ci are incorrect")
+    
+    r_st = RSt(Q0,nbar,alphaB=alphaB)
+    t_eq = Teq_ED(Lwind, rhobar, ci=ci)
+    r_eq = Req_ED(Lwind, rhobar, ci=ci)    
+    t_st = t_eq*(r_st/r_eq)**(5./3)
     return t_st.to("Myr")
 
 def Tdion(Q0, nbar, ci = 10*u.km/u.s, alphaB = 3.11e-13*(u.cm**3/u.s)):

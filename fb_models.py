@@ -193,10 +193,10 @@ class MomentumDriven(Bubble):
 
 
 #########################################################################################
-################################# JOINT EVOLUTION MODELS ################################
+################################### CO-EVOLUTION MODELS #################################
 #########################################################################################
 
-class JointBubbleMD(Bubble):
+class MD_CEM(Bubble):
     # Joint solution for the evolution of a photo-ionized gas bubble
     # and a momentum-driven wind bubble in force balance with one another
     # assumes that the bubbles are uncoupled and evolve independently
@@ -369,7 +369,7 @@ class JointBubbleMD(Bubble):
         press += self.pressure(t)*(t>self.teq)
         return press
 
-class JointBubbleED(Bubble):
+class ED_CEM(Bubble):
     # Joint solution for the evolution of a photo-ionized gas bubble
     # and a wind bubble in force balance with each other
     # assumes that the bubbles are uncoupled and evolve independently

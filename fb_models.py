@@ -86,14 +86,16 @@ class Spitzer(Bubble):
         v_sp = (self.RSt/self.tdio)*(1 + 7*t/(4*self.tdio))**(-3./7)
         return v_sp.to("km/s")
     
-    def momentum(self, t):
+    def momentum(self, t, adj=True):
         t1 = u.get_physical_type(t)=="time"
         if not t1:
             print("Units of t are off")
             assert(False)
         
         prefac = 4*np.pi*self.rho0*self.RSt**4/(3*self.tdio)
-        pr_sp = prefac*(1 + 7*t/(4*self.tdio))**(9./7)*(1 - (self.RSt/self.radius(t))**1.5)
+        pr_sp = prefac*(1 + 7*t/(4*self.tdio))**(9./7)
+        if adj:
+            pr_sp *= (1 - (self.RSt/self.radius(t))**1.5)
         return pr_sp.to("solMass*km/s")
     
     def pressure(self, t):
@@ -429,7 +431,7 @@ class JointBubbleEDUncoupled(Bubble):
 
         # Separate Spitzer solution
         self.spitz_bubble = Spitzer(rho0, Q0, ci=ci, alphaB=alphaB, muH=muH)
-        # separate momentum-driven wind bubble
+        # separate energy-driven wind bubble
         self.wind_bubble = Weaver(rho0, Lwind)
         # call ODE integrator to get the joint evolution solution
         self.joint_sol = self.joint_evol()
@@ -444,17 +446,19 @@ class JointBubbleEDUncoupled(Bubble):
         xiw0 = 1
         xii0 = ((1+(eta**-3))**(1./3))
         Et0 = (2./11)*np.sqrt(7./3)*eta
-        momentum_tot = self.wind_bubble.momentum(self.teq) + self.spitz_bubble.momentum(self.teq)
-        mass_tot = 4*np.pi*self.rho0*((self.Req*xii0)**3)/3
-        Mi0 = (((momentum_tot/mass_tot)/self.ci).to(" ")).value
+        # get initial condition for derivative of xii -> Mi
+        psum = 1.5*np.sqrt(3./7)/eta
+        RiRSteq = 1 + 0.7*np.sqrt(7./3)*eta
+        psum += (RiRSteq**(9./7))*(1 - RiRSteq**(-6./7))/(eta**4)
+        dxii_dchi0 = psum/(xii0**3)
+        Mi0 = (2*eta/np.sqrt(3))*dxii_dchi0
 
-
-        # defin the differential equations
+        # define the differential equations
         def derivs(chi,y):
             (xii,Mi,xiw,Et) = y
             Pt = (11./2)*np.sqrt(3/7)*Et*(xiw**-3)/eta
             A = 2/(3*((xiw*eta)**3)*(Pt**2))
-            dlnxii_dchi = (2/np.sqrt(3))*Mi/xii
+            dlnxii_dchi = (np.sqrt(3)/(2*eta))*Mi/xii
 
             dxii_dchi = dlnxii_dchi*xii
             dMi_dchi = (3*np.sqrt(3)/(2*eta*xii))*(Pt - Mi**2)
@@ -466,7 +470,6 @@ class JointBubbleEDUncoupled(Bubble):
 
         # use solve_ivp to get solution
         return solve_ivp(derivs,[0,100],[xii0,Mi0,xiw0,Et0],dense_output=True)
-
 
     def radius(self, t):
         # Returns the radius of the ionized bubble at time t
@@ -567,7 +570,6 @@ class JointBubbleEDUncoupled(Bubble):
         press = self.spitz_bubble.pressure(t)*(t<self.teq)
         press += self.pressure(t)*(t>self.teq)
         return press
-
 
 class JointBubbleCoupled(Bubble):
     # Joint solution for the evolution of a photo-ionized gas bubble

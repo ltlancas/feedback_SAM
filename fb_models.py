@@ -7,6 +7,7 @@ from astropy import units as u
 from astropy import constants as ac
 import quantities
 from scipy.integrate import solve_ivp
+from scipy.optimize import brentq
 
 #########################################################################################
 ########################### CLASSICAL BUBBLE EVOLUTION MODELS ###########################
@@ -263,11 +264,38 @@ class MD_CEM(Bubble):
         self.pscl = ((4*np.pi/3)*rho0*(self.Req**4)/self.tdio).to("solMass*km/s")
         self.eta = (self.Req/self.RSt).to(" ").value
 
+        if self.eta < 1:
+            self.tswitch = self.teq
+        else:
+            tot = self._get_Tot()
+            self.tswitch = min(self.teq.value, tot.value)*u.Myr
+
+    def _get_Tot(self):
+        # Returns the time at which the WBB overtakes the PIR
+        # used as the seitch-over time in the zeta > 1 case.
+        # root found in dimensionless form, as in Equation C35
+        # of Paper 1
+        fac1 = (4.5**0.25)*np.sqrt(self.eta)
+        f  = lambda x: fac1*np.sqrt(x) - (1 + 1.75*x)**(4./7)
+        # over-take time only matters if it is smaller than t_eq
+        chi_eq = (self.teq/self.tdio).to(" ").value
+        try:
+            chi_ot = brentq(f, 0, chi_eq)
+        except:
+            chi_ot = chi_eq
+        return (chi_ot*self.tdio).to(u.Myr)
+
+    @staticmethod
+    def _get_largest_real(roots):
+        real_roots = np.real(roots[np.isreal(roots)])
+        return np.max(real_roots)
+
     def get_xiw(self, xii):
         xiw = []
         for xi in xii:
             p = [self.eta**-3, 1.0, 0., 0., -1*(xi**3)]
-            xiw.append(np.real(np.roots(p)[-1]))
+            roots = np.roots(p)
+            xiw.append(self._get_largest_real(np.roots(p)))
         return np.array(xiw)
 
     def joint_evol(self):
@@ -277,9 +305,14 @@ class MD_CEM(Bubble):
 
         eta = self.eta
 
-        xiw0 = 1
-        xii0 = ((1+(eta**-3))**(1./3))
-        momentum_tot = self.wind_bubble.momentum(self.teq) + self.spitz_bubble.momentum(self.teq)
+        if eta < 1:
+            xiw0 = 1
+        else:
+            xiw0 = self.wind_bubble.radius(self.tswitch)/self.Req
+            xiw0 = xiw0.to(" ").value
+        xii0 = xiw0*((1+(eta**-3)*xiw0)**(1./3))
+        momentum_tot = self.wind_bubble.momentum(self.tswitch)
+        momentum_tot += self.spitz_bubble.momentum(self.tswitch)
         mass_tot = 4*np.pi*self.rho0*((self.Req*xii0)**3)/3
         psi0 = (((momentum_tot/mass_tot)*(self.tdio/self.Req)).to(" ")).value
 
@@ -303,34 +336,34 @@ class MD_CEM(Bubble):
         # Returns the radius of the ionized bubble at time t
         # t : the time
         self._check_time_units(t)
-        ri = self.spitz_bubble.radius(t)*(t<self.teq)
-        chi = ((t-self.teq)/self.tdio).to(" ").value
+        ri = self.spitz_bubble.radius(t)*(t<self.tswitch)
+        chi = ((t-self.tswitch)/self.tdio).to(" ").value
         solution =  self.joint_sol.sol(chi)
-        ri += solution[0]*self.Req*(t>self.teq)
+        ri += solution[0]*self.Req*(t>self.tswitch)
         return ri.to("pc")
 
     def wind_radius(self, t):
         # Returns the radius of the wind bubble at time t
         # t : the time
         self._check_time_units(t)
-        # up until teq the wind bubble follows the normal momentum-driven solution
-        rw = self.wind_bubble.radius(t)*(t<self.teq)
+        # up until tswitch the wind bubble follows the normal momentum-driven solution
+        rw = self.wind_bubble.radius(t)*(t<self.tswitch)
         # afterwards it follows the joint evolution solution
-        chi = ((t-self.teq)/self.tdio).to(" ").value
+        chi = ((t-self.tswitch)/self.tdio).to(" ").value
         solution =  self.joint_sol.sol(chi)
         xiw = self.get_xiw(solution[0])
-        rw += xiw*self.Req*(t>self.teq)
+        rw += xiw*self.Req*(t>self.tswitch)
         return rw.to("pc")
 
     def velocity(self, t):
         # Returns the velocity of the ionized bubble at time t
         # t : the time
         self._check_time_units(t)
-        # up until teq the ionized bubble follows the Spitzer solution
-        vi = self.spitz_bubble.velocity(t)*(t<self.teq)
-        chi = ((t-self.teq)/self.tdio).to(" ").value
+        # up until tswitch the ionized bubble follows the Spitzer solution
+        vi = self.spitz_bubble.velocity(t)*(t<self.tswitch)
+        chi = ((t-self.tswitch)/self.tdio).to(" ").value
         solution =  self.joint_sol.sol(chi)
-        vi += solution[1]*self.Req/self.tdio*(t>self.teq)
+        vi += solution[1]*self.Req/self.tdio*(t>self.tswitch)
         return vi.to("km/s")
     
     def momentum(self, t):
@@ -338,11 +371,11 @@ class MD_CEM(Bubble):
         # t : the time
         self._check_time_units(t)
         prefac = self.pscl
-        chi = ((t-self.teq)/self.tdio).to(" ").value
+        chi = ((t-self.tswitch)/self.tdio).to(" ").value
         solution =  self.joint_sol.sol(chi)
-        pr = prefac*solution[1]*solution[0]**3*(t>self.teq)
-        pr += self.spitz_bubble.momentum(t)*(t<self.teq)
-        pr += self.wind_bubble.momentum(t)*(t<self.teq)
+        pr = prefac*solution[1]*solution[0]**3*(t>self.tswitch)
+        pr += self.spitz_bubble.momentum(t)*(t<self.tswitch)
+        pr += self.wind_bubble.momentum(t)*(t<self.tswitch)
         return pr.to("solMass*km/s")
 
     def momentum_uncoupled(self, t):
@@ -365,8 +398,8 @@ class MD_CEM(Bubble):
         # returns the pressure of the ionized bubble at time t
         # t : the time
         self._check_time_units(t)
-        press = self.spitz_bubble.pressure(t)*(t<self.teq)
-        press += self.pressure(t)*(t>self.teq)
+        press = self.spitz_bubble.pressure(t)*(t<self.tswitch)
+        press += self.pressure(t)*(t>self.tswitch)
         return press
 
 class ED_CEM(Bubble):
@@ -436,6 +469,26 @@ class ED_CEM(Bubble):
         self.pscl = ((4*np.pi/3)*rho0*(self.Req**4)/self.tdio).to("solMass*km/s")
 
         self.eta = (self.Req/self.RSt).to(" ").value
+        if self.eta < 1:
+            self.tswitch = self.teq
+        else:
+            tot = self._get_Tot()
+            self.tswitch = min(self.teq.value, tot.value)*u.Myr
+
+    def _get_Tot(self):
+        # Returns the time at which the WBB overtakes the PIR
+        # used as the seitch-over time in the zeta > 1 case.
+        # root found in dimensionless form, as in Equation C35
+        # of Paper 1
+        fac1 = ((2.5*np.sqrt(3./7))**0.6)*(self.eta**0.4)
+        f  = lambda x: fac1*(x**0.6) - (1 + 1.75*x)**(4./7)
+        # over-take time only matters if it is smaller than t_eq
+        chi_eq = (self.teq/self.tdio).to(" ").value
+        try:
+            chi_ot = brentq(f, 0, chi_eq)
+        except:
+            chi_ot = chi_eq
+        return (chi_ot*self.tdio).to(u.Myr)
 
     def joint_evol(self):
         # Gives the solution for the joint dynamical evolution of
@@ -444,14 +497,19 @@ class ED_CEM(Bubble):
 
         eta = self.eta
 
-        xiw0 = 1
-        xii0 = ((1+(eta**-3))**(1./3))
-        Et0 = (2./11)*np.sqrt(7./3)*eta
+        if eta < 1:
+            xiw0 = 1
+        else:
+            xiw0 = self.wind_bubble.radius(self.tswitch)/self.Req
+        xii0 = xiw0*((1+(eta**-3)*xiw0)**(1./3))
+        Pfac = self.wind_bubble.pressure(self.tswitch)*ac.k_B/(self.rho0*self.ci**2)
+        Pfac = Pfac.to(" ").value
+        Et0 = (2./11)*np.sqrt(7./3)*eta*(xiw0**3)*Pfac
         # get initial condition for derivative of xii -> Mi
-        psum = 1.5*np.sqrt(3./7)/eta
-        RiRSteq = 1 + 0.7*np.sqrt(7./3)*eta
-        psum += (RiRSteq**(9./7))*(1 - RiRSteq**(-6./7))/(eta**4)
-        dxii_dchi0 = psum/(xii0**3)
+        momentum_tot = self.wind_bubble.momentum(self.tswitch)
+        momentum_tot += self.spitz_bubble.momentum(self.tswitch)
+        mass_tot = 4*np.pi*self.rho0*((self.Req*xii0)**3)/3
+        dxii_dchi0 = (((momentum_tot/mass_tot)*(self.tdio/self.Req)).to(" ")).value
         Mi0 = (2*eta/np.sqrt(3))*dxii_dchi0
 
         # define the differential equations
@@ -476,34 +534,34 @@ class ED_CEM(Bubble):
         # Returns the radius of the ionized bubble at time t
         # t : the time
         self._check_time_units(t)
-        ri = self.spitz_bubble.radius(t)*(t<self.teq)
-        chi = ((t-self.teq)/self.tdio).to(" ").value
+        ri = self.spitz_bubble.radius(t)*(t<self.tswitch)
+        chi = ((t-self.tswitch)/self.tdio).to(" ").value
         solution =  self.joint_sol.sol(chi)
-        ri += solution[0]*self.Req*(t>self.teq)
+        ri += solution[0]*self.Req*(t>self.tswitch)
         return ri.to("pc")
 
     def wind_radius(self, t):
         # Returns the radius of the wind bubble at time t
         # t : the time
         self._check_time_units(t)        
-        # up until teq the wind bubble follows the normal momentum-driven solution
-        rw = self.wind_bubble.radius(t)*(t<self.teq)
+        # up until tswitch the wind bubble follows the normal momentum-driven solution
+        rw = self.wind_bubble.radius(t)*(t<self.tswitch)
         # afterwards it follows the joint evolution solution
-        chi = ((t-self.teq)/self.tdio).to(" ").value
+        chi = ((t-self.tswitch)/self.tdio).to(" ").value
         solution =  self.joint_sol.sol(chi)
         xiw = solution[2]
-        rw += xiw*self.Req*(t>self.teq)
+        rw += xiw*self.Req*(t>self.tswitch)
         return rw.to("pc")
 
     def velocity(self, t):
         # Returns the velocity of the ionized bubble at time t
         # t : the time
         self._check_time_units(t)
-        # up until teq the ionized bubble follows the Spitzer solution
-        vi = self.spitz_bubble.velocity(t)*(t<self.teq)
-        chi = ((t-self.teq)/self.tdio).to(" ").value
+        # up until tswitch the ionized bubble follows the Spitzer solution
+        vi = self.spitz_bubble.velocity(t)*(t<self.tswitch)
+        chi = ((t-self.tswitch)/self.tdio).to(" ").value
         solution =  self.joint_sol.sol(chi)
-        vi += solution[1]*self.ci*(t>self.teq)
+        vi += solution[1]*self.ci*(t>self.tswitch)
         return vi.to("km/s")
     
     def momentum(self, t):
@@ -511,11 +569,11 @@ class ED_CEM(Bubble):
         # t : the time
         self._check_time_units(t)
         prefac = (4*np.pi/3)*self.Req**3*self.rho0*self.ci
-        chi = ((t-self.teq)/self.tdio).to(" ").value
+        chi = ((t-self.tswitch)/self.tdio).to(" ").value
         solution =  self.joint_sol.sol(chi)
-        pr = prefac*solution[1]*solution[0]**3*(t>self.teq)
-        pr += self.spitz_bubble.momentum(t)*(t<self.teq)
-        pr += self.wind_bubble.momentum(t)*(t<self.teq)
+        pr = prefac*solution[1]*solution[0]**3*(t>self.tswitch)
+        pr += self.spitz_bubble.momentum(t)*(t<self.tswitch)
+        pr += self.wind_bubble.momentum(t)*(t<self.tswitch)
         return pr.to("solMass*km/s")
 
     def momentum_uncoupled(self, t):
@@ -531,18 +589,18 @@ class ED_CEM(Bubble):
         # returns the pressure of the wind bubble at time t
         # t : the time
         self._check_time_units(t)
-        press = self.wind_bubble.pressure(t)*(t<self.teq)
-        chi = ((t-self.teq)/self.tdio).to(" ").value
+        press = self.wind_bubble.pressure(t)*(t<self.tswitch)
+        chi = ((t-self.tswitch)/self.tdio).to(" ").value
         solution =  self.joint_sol.sol(chi)
         Pt = (11./2)*np.sqrt(3/7)*solution[3]*(solution[2]**-3)/self.eta
         Pt = Pt*self.rho0*self.ci**2
-        press += Pt*(t>self.teq)/ac.k_B
+        press += Pt*(t>self.tswitch)/ac.k_B
         return (press).to("K/cm3")
     
     def pressure_ionized(self, t):
         # returns the pressure of the ionized bubble at time t
         # t : the time
         self._check_time_units(t)
-        press = self.spitz_bubble.pressure(t)*(t<self.teq)
-        press += self.pressure(t)*(t>self.teq)
+        press = self.spitz_bubble.pressure(t)*(t<self.tswitch)
+        press += self.pressure(t)*(t>self.tswitch)
         return press

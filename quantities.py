@@ -157,7 +157,7 @@ def Tcool(nbar, Lwind):
     return t_cool
 
 
-def Tion(nbar, alphaB=3.11e-13*(u.cm**3/u.s)):
+def Trec(nbar, alphaB=3.11e-13*(u.cm**3/u.s)):
     # gives the ionization-recombination time-scale in Myr
     # nbar : the number density of hydrgen in the background
     # alphaB : the case B recombination rate

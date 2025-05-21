@@ -262,9 +262,9 @@ class MD_CEM(Bubble):
         self.tdio = quantities.Tdion(Q0, self.nbar, ci=ci, alphaB=alphaB)
         self.tff = quantities.Tff(rho0)
         self.pscl = ((4*np.pi/3)*rho0*(self.Req**4)/self.tdio).to("solMass*km/s")
-        self.eta = (self.Req/self.RSt).to(" ").value
+        self.zeta = (self.Req/self.RSt).to(" ").value
 
-        if self.eta < 1:
+        if self.zeta < 1:
             self.tswitch = self.teq
         else:
             tot = self._get_Tot()
@@ -275,7 +275,7 @@ class MD_CEM(Bubble):
         # used as the seitch-over time in the zeta > 1 case.
         # root found in dimensionless form, as in Equation C35
         # of Paper 1
-        fac1 = (4.5**0.25)*np.sqrt(self.eta)
+        fac1 = (4.5**0.25)*np.sqrt(self.zeta)
         f  = lambda x: fac1*np.sqrt(x) - (1 + 1.75*x)**(4./7)
         # over-take time only matters if it is smaller than t_eq
         chi_eq = (self.teq/self.tdio).to(" ").value
@@ -293,7 +293,7 @@ class MD_CEM(Bubble):
     def get_xiw(self, xii):
         xiw = []
         for xi in xii:
-            p = [self.eta**-3, 1.0, 0., 0., -1*(xi**3)]
+            p = [self.zeta**-3, 1.0, 0., 0., -1*(xi**3)]
             roots = np.roots(p)
             xiw.append(self._get_largest_real(np.roots(p)))
         return np.array(xiw)
@@ -301,16 +301,16 @@ class MD_CEM(Bubble):
     def joint_evol(self):
         # Gives the solution for the joint dynamical evolution of
         # photo-ionized gas and a wind bubble
-        # eta : the Req/RSt ratio, free parameter of the model
+        # zeta : the Req/RSt ratio, free parameter of the model
 
-        eta = self.eta
+        zeta = self.zeta
 
-        if eta < 1:
+        if zeta < 1:
             xiw0 = 1
         else:
             xiw0 = self.wind_bubble.radius(self.tswitch)/self.Req
             xiw0 = xiw0.to(" ").value
-        xii0 = xiw0*((1+(eta**-3)*xiw0)**(1./3))
+        xii0 = xiw0*((1+(zeta**-3)*xiw0)**(1./3))
         momentum_tot = self.wind_bubble.momentum(self.tswitch)
         momentum_tot += self.spitz_bubble.momentum(self.tswitch)
         mass_tot = 4*np.pi*self.rho0*((self.Req*xii0)**3)/3
@@ -325,7 +325,7 @@ class MD_CEM(Bubble):
             xii = y[0]
             psi = y[1]
             xiw = np.interp(xii,xii_range,xiw_prec)
-            t1 = (2.25*(eta**-2)*(1 + (eta**-3)*xiw)**(2./3))/(xii**3)
+            t1 = (2.25*(zeta**-2)*(1 + (zeta**-3)*xiw)**(2./3))/(xii**3)
             t2 = 3*(psi**2)/xii
             return (psi,t1-t2)
 
@@ -468,8 +468,8 @@ class ED_CEM(Bubble):
         self.tff = quantities.Tff(rho0)
         self.pscl = ((4*np.pi/3)*rho0*(self.Req**4)/self.tdio).to("solMass*km/s")
 
-        self.eta = (self.Req/self.RSt).to(" ").value
-        if self.eta < 1:
+        self.zeta = (self.Req/self.RSt).to(" ").value
+        if self.zeta < 1:
             self.tswitch = self.teq
         else:
             tot = self._get_Tot()
@@ -480,7 +480,7 @@ class ED_CEM(Bubble):
         # used as the seitch-over time in the zeta > 1 case.
         # root found in dimensionless form, as in Equation C35
         # of Paper 1
-        fac1 = ((2.5*np.sqrt(3./7))**0.6)*(self.eta**0.4)
+        fac1 = ((2.5*np.sqrt(3./7))**0.6)*(self.zeta**0.4)
         f  = lambda x: fac1*(x**0.6) - (1 + 1.75*x)**(4./7)
         # over-take time only matters if it is smaller than t_eq
         chi_eq = (self.teq/self.tdio).to(" ").value
@@ -493,34 +493,34 @@ class ED_CEM(Bubble):
     def joint_evol(self):
         # Gives the solution for the joint dynamical evolution of
         # photo-ionized gas and a wind bubble
-        # eta : the Req/RSt ratio, free parameter of the model
+        # zeta : the Req/RSt ratio, free parameter of the model
 
-        eta = self.eta
+        zeta = self.zeta
 
-        if eta < 1:
+        if zeta < 1:
             xiw0 = 1
         else:
             xiw0 = self.wind_bubble.radius(self.tswitch)/self.Req
-        xii0 = xiw0*((1+(eta**-3)*xiw0)**(1./3))
+        xii0 = xiw0*((1+(zeta**-3)*xiw0)**(1./3))
         Pfac = self.wind_bubble.pressure(self.tswitch)*ac.k_B/(self.rho0*self.ci**2)
         Pfac = Pfac.to(" ").value
-        Et0 = (2./11)*np.sqrt(7./3)*eta*(xiw0**3)*Pfac
+        Et0 = (2./11)*np.sqrt(7./3)*zeta*(xiw0**3)*Pfac
         # get initial condition for derivative of xii -> Mi
         momentum_tot = self.wind_bubble.momentum(self.tswitch)
         momentum_tot += self.spitz_bubble.momentum(self.tswitch)
         mass_tot = 4*np.pi*self.rho0*((self.Req*xii0)**3)/3
         dxii_dchi0 = (((momentum_tot/mass_tot)*(self.tdio/self.Req)).to(" ")).value
-        Mi0 = (2*eta/np.sqrt(3))*dxii_dchi0
+        Mi0 = (2*zeta/np.sqrt(3))*dxii_dchi0
 
         # define the differential equations
         def derivs(chi,y):
             (xii,Mi,xiw,Et) = y
-            Pt = (11./2)*np.sqrt(3/7)*Et*(xiw**-3)/eta
-            A = 2/(3*((xiw*eta)**3)*(Pt**2))
-            dlnxii_dchi = (np.sqrt(3)/(2*eta))*Mi/xii
+            Pt = (11./2)*np.sqrt(3/7)*Et*(xiw**-3)/zeta
+            A = 2/(3*((xiw*zeta)**3)*(Pt**2))
+            dlnxii_dchi = (np.sqrt(3)/(2*zeta))*Mi/xii
 
             dxii_dchi = dlnxii_dchi*xii
-            dMi_dchi = (3*np.sqrt(3)/(2*eta*xii))*(Pt - Mi**2)
+            dMi_dchi = (3*np.sqrt(3)/(2*zeta*xii))*(Pt - Mi**2)
             dlnxiw_dchi = (((xii/xiw)**3)*dlnxii_dchi + A/Et)/(1 + 5*A)
             dxiw_dchi = dlnxiw_dchi*xiw
             dlnEt_chi = 1./Et - 2*dlnxiw_dchi
@@ -592,7 +592,7 @@ class ED_CEM(Bubble):
         press = self.wind_bubble.pressure(t)*(t<self.tswitch)
         chi = ((t-self.tswitch)/self.tdio).to(" ").value
         solution =  self.joint_sol.sol(chi)
-        Pt = (11./2)*np.sqrt(3/7)*solution[3]*(solution[2]**-3)/self.eta
+        Pt = (11./2)*np.sqrt(3/7)*solution[3]*(solution[2]**-3)/self.zeta
         Pt = Pt*self.rho0*self.ci**2
         press += Pt*(t>self.tswitch)/ac.k_B
         return (press).to("K/cm3")

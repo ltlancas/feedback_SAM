@@ -114,7 +114,7 @@ class Spitzer(Bubble):
         press_sp = self.rhoi(t)*self.ci**2
         return (press_sp/ac.k_B).to("K/cm3")
 
-class Weaver(Bubble):
+class EnergyDrivenWind(Bubble):
     # Weaver solution for a wind bubble
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -153,7 +153,7 @@ class Weaver(Bubble):
         press_we = (10./33)*self.Lwind*t/((4*np.pi/3)*self.radius(t)**3)
         return (press_we/ac.k_B).to("K/cm3")
     
-class MomentumDriven(Bubble):
+class MomentumDrivenWind(Bubble):
     # Momentum-driven bubble solution
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -214,7 +214,7 @@ class MD_CEM(Bubble):
         self.spitz_bubble = Spitzer(**sp_dict)
         # separate momentum-driven wind bubble
         md_dict = {"rho0": self.rho0, "pdotw": self.pdotw}
-        self.wind_bubble = MomentumDriven(**md_dict)
+        self.wind_bubble = MomentumDrivenWind(**md_dict)
         # call ODE integrator to get the joint evolution solution
         self.joint_sol = self.joint_evol()
 
@@ -419,7 +419,7 @@ class ED_CEM(Bubble):
         self.spitz_bubble = Spitzer(**sp_dict)
         # separate energy-driven wind bubble
         w_dict = {"rho0": self.rho0, "Lwind": self.Lwind}
-        self.wind_bubble = Weaver(**w_dict)
+        self.wind_bubble = EnergyDrivenWind(**w_dict)
         # call ODE integrator to get the joint evolution solution
         self.joint_sol = self.joint_evol()
 

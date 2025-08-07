@@ -47,6 +47,40 @@ class Bubble():
     def pressure(self, t):
         return 0.0
 
+class SedovTaylorBW(Bubble):
+    # Sedov Taylor Solution for an instantaneous blast wave
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._set_parmeters(**kwargs)
+        self._check_parameter_units()
+
+    def _set_parmeters(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+        if "E" not in self.__dict__:
+            self.E = 1e51*u.erg
+    
+    def _check_parameter_units(self):
+        t1 = u.get_physical_type(self.E)=="energy"
+        if not(t1):
+            raise ValueError("Units of E are incorrect")
+
+    def radius(self, t):
+        self._check_time_units(t)
+        r_ST = 1.15167*(self.E*t**2/(self.rho0))**(1./5)
+        return r_ST.to("pc")
+    
+    def velocity(self, t):
+        self._check_time_units(t)
+        v_ST = 0.4*self.radius(t)/t
+        return v_ST.to("km/s")
+    
+    def momentum(self, t):
+        self._check_time_units(t)
+        pr_ST = 4*np.pi*self.rho0*self.radius(t)**3*self.velocity(t)/3
+        return pr_ST.to("solMass*km/s")
+
 class Spitzer(Bubble):
     # Spitzer solution for a photo-ionized gas bubble
     # includes the Hosokawa & Inutsuka (2006) correction
